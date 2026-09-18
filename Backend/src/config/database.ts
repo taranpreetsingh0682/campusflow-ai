@@ -1,18 +1,24 @@
 import mongoose from "mongoose";
 
-const connectDB = async (): Promise<void> => {
+const connectDB = async () => {
   try {
-    const mongoURI = process.env.MONGODB_URI;
+    const mongoUri = process.env.MONGODB_URI;
 
-    if (!mongoURI) {
-      throw new Error("MONGODB_URI is not defined in .env");
+    if (!mongoUri) {
+      throw new Error("MONGODB_URI is not defined");
     }
 
-    await mongoose.connect(mongoURI);
+    const connectionInstance = await mongoose.connect(mongoUri);
 
-    console.log("MongoDB Atlas connected successfully");
+    console.log(
+      `✅ MongoDB Connected: ${connectionInstance.connection.host}`
+    );
   } catch (error) {
-    console.error("MongoDB connection failed:", error);
+    console.error(
+      "❌ MongoDB Connection Failed:",
+      error instanceof Error ? error.message : error
+    );
+
     process.exit(1);
   }
 };
