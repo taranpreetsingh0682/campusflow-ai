@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import authRoutes from "./routes/auth.routes";
+import profileRoutes from "./routes/profile.routes";
 
 const app = express();
 
@@ -8,6 +9,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use("/api/auth", authRoutes);
+app.use("/api/",profileRoutes);
 
 // Health check
 app.get("/", (_req, res) => {
