@@ -9,8 +9,8 @@ export const protect = (
   try {
     const authHeader = req.headers.authorization;
 
-    console.log("========== AUTH DEBUG ==========");
-    console.log("Authorization header:", authHeader);
+    console.log("========== JWT DEBUG ==========");
+    console.log("Authorization Header:", authHeader);
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({
@@ -28,7 +28,8 @@ export const protect = (
       process.env.JWT_SECRET as string
     );
 
-    console.log("Token decoded successfully:", decoded);
+    console.log("JWT verified successfully");
+    console.log("Decoded JWT:", decoded);
 
     (req as any).user = decoded;
 
