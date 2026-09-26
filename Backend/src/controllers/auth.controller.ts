@@ -107,6 +107,8 @@ export const loginUser = async (req: Request, res: Response) => {
     }
 
     // 4. Create JWT token
+
+    console.log("JWT_SECRET exists:", !!process.env.JWT_SECRET);
     const token = jwt.sign(
       {
         id: user._id,
@@ -118,6 +120,9 @@ export const loginUser = async (req: Request, res: Response) => {
         expiresIn: "1d",
       }
     );
+console.log("=== NEW JWT CREATED ===");
+console.log("Issued at:", new Date());
+console.log("Expires at:", new Date(Date.now() + 24 * 60 * 60 * 1000));
 
     // 5. Send successful response
     return res.status(200).json({
