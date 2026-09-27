@@ -67,18 +67,3 @@ const feeStructureSchema = new Schema<IFeeStructure>(
   }
 );
 
-feeStructureSchema.index(
-  {
-    department: 1,
-    semester: 1,
-    academicYear: 1,
-  },
-  {
-    unique: true,
-  }
-);
-
-export default mongoose.model<IFeeStructure>(
-  "FeeStructure",
-  feeStructureSchema
-);
