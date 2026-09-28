@@ -80,7 +80,7 @@ export const createFeeStructure = async (
 
 // Get all fee structures
 export const getAllFeeStructures = async (
-  req: Request,
+  _req: Request,
   res: Response
 ): Promise<void> => {
   try {
