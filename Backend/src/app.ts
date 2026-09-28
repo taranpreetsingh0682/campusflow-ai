@@ -14,7 +14,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/",profileRoutes);
 app.use("/api/admin",adminRoutes);
 app.use("/api/students",studentRoutes);
-app.use("api/fees",FeeStructureRoutes);
+app.use("/api/fees",FeeStructureRoutes);
 
 // Health check
 app.get("/", (_req, res) => {
