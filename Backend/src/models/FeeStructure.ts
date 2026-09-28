@@ -67,3 +67,31 @@ const feeStructureSchema = new Schema<IFeeStructure>(
   }
 );
 
+// Automatically calculate total fee
+feeStructureSchema.pre("validate", function () {
+  this.totalFee =
+    this.tuitionFee +
+    this.examFee +
+    this.libraryFee +
+    this.otherFee;
+});
+
+// Prevent duplicate fee structures
+// for the same department, semester and academic year
+feeStructureSchema.index(
+  {
+    department: 1,
+    semester: 1,
+    academicYear: 1,
+  },
+  {
+    unique: true,
+  }
+);
+
+const FeeStructure = mongoose.model<IFeeStructure>(
+  "FeeStructure",
+  feeStructureSchema
+);
+
+export default FeeStructure;
