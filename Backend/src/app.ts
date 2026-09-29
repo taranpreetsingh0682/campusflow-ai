@@ -5,6 +5,7 @@ import profileRoutes from "./routes/profile.routes";
 import adminRoutes from "./routes/admin.routes";
 import studentRoutes from "./routes/student.routes";
 import FeeStructureRoutes from "./routes/FeeStructure.routes";
+import "./models/Department";
 const app = express();
 
 // Middleware
