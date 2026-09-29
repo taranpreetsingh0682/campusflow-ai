@@ -6,6 +6,10 @@ import adminRoutes from "./routes/admin.routes";
 import studentRoutes from "./routes/student.routes";
 import FeeStructureRoutes from "./routes/FeeStructure.routes";
 import "./models/Department";
+import scholarshipRoutes from "./routes/Scholarship.routes";
+
+
+
 const app = express();
 
 // Middleware
@@ -16,6 +20,7 @@ app.use("/api/",profileRoutes);
 app.use("/api/admin",adminRoutes);
 app.use("/api/students",studentRoutes);
 app.use("/api/fees",FeeStructureRoutes);
+app.use("/api/scholarship",scholarshipRoutes);
 
 // Health check
 app.get("/", (_req, res) => {
