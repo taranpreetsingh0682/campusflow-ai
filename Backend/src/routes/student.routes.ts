@@ -1,15 +1,23 @@
 import { Router } from "express";
 
 import {
-  createStudent,
-  getStudentProfile,
-} from "../controllers/student.controller";
-
-import { protect } from "../middleware/auth.middleware";
+  createStudentFee,
+  getAllStudentFees,
+  getStudentFeeById,
+  updateStudentFee,
+  deleteStudentFee,
+} from "../controllers/StudentFee.controller";
 
 const router = Router();
 
-router.post("/", createStudent);
-router.get("/:id", protect, getStudentProfile);
+router.post("/", createStudentFee);
+
+router.get("/", getAllStudentFees);
+
+router.get("/:id", getStudentFeeById);
+
+router.put("/:id", updateStudentFee);
+
+router.delete("/:id", deleteStudentFee);
 
 export default router;
