@@ -22,7 +22,7 @@ app.use("/api/admin",adminRoutes);
 app.use("/api/students",studentRoutes);
 app.use("/api/fees",FeeStructureRoutes);
 app.use("/api/scholarship",scholarshipRoutes);
-app.use("/api/student-fees",StudentFeeRoutes);
+app.use("/api/student-fee",StudentFeeRoutes);
 
 // Health check
 app.get("/", (_req, res) => {
