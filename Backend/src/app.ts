@@ -7,6 +7,7 @@ import studentRoutes from "./routes/student.routes";
 import FeeStructureRoutes from "./routes/FeeStructure.routes";
 import "./models/Department";
 import scholarshipRoutes from "./routes/Scholarship.routes";
+import StudentFeeRoutes from "./routes/StudentFee.routes";
 
 
 
@@ -21,6 +22,7 @@ app.use("/api/admin",adminRoutes);
 app.use("/api/students",studentRoutes);
 app.use("/api/fees",FeeStructureRoutes);
 app.use("/api/scholarship",scholarshipRoutes);
+app.use("/api/student-fees",StudentFeeRoutes);
 
 // Health check
 app.get("/", (_req, res) => {
