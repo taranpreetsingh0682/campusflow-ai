@@ -1,41 +1,46 @@
-import mongoose, {Document, Schema } from "mongoose";
+import mongoose, { Document, Schema } from "mongoose";
 
-export interface IFaculty extends Document{
-  user:mongoose.Types.ObjectId;
-  employeeId:String;
-  departments:mongoose.Types.ObjectId;
-  subjects:mongoose.Types.ObjectId;
-
-
+export interface IFaculty extends Document {
+  user: mongoose.Types.ObjectId;
+  employeeId: string;
+  departments: mongoose.Types.ObjectId[];
+  subjects: mongoose.Types.ObjectId[];
 }
-const facultySchema =new Schema<IFaculty>(
+
+const facultySchema = new Schema<IFaculty>(
   {
-    user:{
-   type: Schema.Types.ObjectId,
-   ref: "User",
-   required:true,
-   unique:true,
-
-
+    user: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      unique: true,
     },
-    employeeId:{
+
+    employeeId: {
       type: String,
-      required:true,
-      unique:true,
-      trim:true,
-
+      required: true,
+      unique: true,
+      trim: true,
     },
-    departments:[
+
+    departments: [
       {
-        type:Schema.Types.ObjectId,
-        ref:"Department",
-        required:true,
+        type: Schema.Types.ObjectId,
+        ref: "Department",
+        required: true,
+      },
+    ],
+
+    subjects: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Subject",
       },
     ],
   },
-    {
-      timestamps:true,
-    }
-  
+  {
+    timestamps: true,
+  }
 );
-export default mongoose.model<IFaculty>("Faculty",facultySchema);
+
+export default mongoose.model<IFaculty>("Faculty", facultySchema);
