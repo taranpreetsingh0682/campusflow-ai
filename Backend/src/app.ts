@@ -9,6 +9,7 @@ import "./models/Department";
 import scholarshipRoutes from "./routes/Scholarship.routes";
 import StudentFeeRoutes from "./routes/StudentFee.routes";
 import PaymentRoutes from "./routes/Payment.routes";
+import EnrollmentRoutes from "./routes/Enrollment.routes";
 
 
 
@@ -26,7 +27,7 @@ app.use("/api/scholarship",scholarshipRoutes);
 console.log("🔥 STUDENT FEE ROUTE LOADED");
 app.use("/api/student-fees",StudentFeeRoutes);
 app.use("/api/payments",PaymentRoutes);
-
+app.use("/api/enrollments",EnrollmentRoutes);
 // Health check
 app.get("/", (_req, res) => {
   res.status(200).json({
