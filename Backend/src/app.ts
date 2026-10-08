@@ -12,6 +12,7 @@ import PaymentRoutes from "./routes/Payment.routes";
 import EnrollmentRoutes from "./routes/Enrollment.routes";
 import FacultyRoutes from "./routes/Faculty.routes";
 import SubjectRoutes from "./routes/Subject.routes";
+import AttendanceRoutes from "./routes/Attendance.routes";
 
 
 const app = express();
@@ -31,6 +32,7 @@ app.use("/api/payments",PaymentRoutes);
 app.use("/api/enrollments",EnrollmentRoutes);
 app.use("/api/faculty",FacultyRoutes);
 app.use("/api/subjects",SubjectRoutes);
+app.use("/api/attendance",AttendanceRoutes);
 
 
 
