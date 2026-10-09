@@ -221,7 +221,7 @@ export const createMarks = async (req: Request, res: Response) => {
 // =====================================================
 // GET ALL MARKS
 // =====================================================
-export const getAllMarks = async (req: Request, res: Response) => {
+export const getAllMarks = async (_req: Request, res: Response) => {
   try {
     const marks = await Marks.find()
       .populate("student")
