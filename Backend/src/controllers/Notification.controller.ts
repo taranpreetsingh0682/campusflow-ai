@@ -78,7 +78,7 @@ export const createNotification = async (req: Request, res: Response) => {
 export const getUserNotifications = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
+    if (typeof userId !== "string" || !mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ success: false, message: "Invalid user ID" });
     }
 
@@ -118,7 +118,8 @@ export const markNotificationAsRead = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { userId } = req.body;
 
-    if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(userId)) {
+    if (typeof id !== "string" || typeof userId !== "string" ||
+      !mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ success: false, message: "Valid notification ID and userId are required" });
     }
 
