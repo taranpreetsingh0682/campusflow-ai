@@ -15,6 +15,7 @@ import SubjectRoutes from "./routes/Subject.routes";
 import AttendanceRoutes from "./routes/Attendance.routes";
 import MarksRoutes from "./routes/Marks.routes";
 import NotificationRoutes from "./routes/Notification.routes";
+import ComplaintRoutes from "./routes/Complaint.routes";
 
 
 const app = express();
@@ -37,6 +38,7 @@ app.use("/api/subjects",SubjectRoutes);
 app.use("/api/attendance",AttendanceRoutes);
 app.use("/api/marks",MarksRoutes);
 app.use("/api/notifications",NotificationRoutes);
+app.use("/api/complaints",ComplaintRoutes);
 
 
 
