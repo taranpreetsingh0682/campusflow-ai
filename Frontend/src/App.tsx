@@ -1,13 +1,27 @@
 
+import { useState } from "react";
 import LoginPage from "./sections/LoginPage";
+import RegisterPage from "./sections/RegisterPage";
 
 export default function App() {
-  return <LoginPage
-    onLoginSuccess={(user) => {
-      console.log("Login successful:", user);
-    }}
-    onRegisterClick={() => {
-      console.log("Register page will be added next.");
-    }}
-  />;
+  const [currentPage, setCurrentPage] = useState<
+    "login" | "register"
+  >("login");
+
+  if (currentPage === "register") {
+    return (
+      <RegisterPage
+        onLoginClick={() => setCurrentPage("login")}
+      />
+    );
+  }
+
+  return (
+    <LoginPage
+      onLoginSuccess={(user) => {
+        console.log("Login successful:", user);
+      }}
+      onRegisterClick={() => setCurrentPage("register")}
+    />
+  );
 }
