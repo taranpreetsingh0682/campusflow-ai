@@ -1,3 +1,4 @@
+
 import mongoose, { Document, Schema } from "mongoose";
 
 export interface IUser extends Document {
@@ -5,7 +6,9 @@ export interface IUser extends Document {
   email: string;
   password: string;
   role: "admin" | "developer" | "student" | "faculty" | "accounts" | "hod";
+  college?: string;
   department?: string;
+  academicYear?: number;
   rollNumber?: string;
 }
 
@@ -36,9 +39,20 @@ const userSchema = new Schema<IUser>(
       default: "student",
     },
 
+    college: {
+      type: String,
+      trim: true,
+    },
+
     department: {
       type: String,
       trim: true,
+    },
+
+    academicYear: {
+      type: Number,
+      min: 1,
+      max: 4,
     },
 
     rollNumber: {
