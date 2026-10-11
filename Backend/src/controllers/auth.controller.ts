@@ -3,7 +3,43 @@ import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import User from "../models/User";
 import jwt from "jsonwebtoken";
+import { OAuth2Client } from "google-auth-library";
 
+const googleClient = new OAuth2Client();
+
+function createAuthToken(user: InstanceType<typeof User>): string {
+  const jwtSecret = process.env.JWT_SECRET;
+
+  if (!jwtSecret) {
+    throw new Error("JWT_SECRET is missing from environment variables");
+  }
+
+  return jwt.sign(
+    {
+      id: user._id.toString(),
+      email: user.email,
+      role: user.role,
+      department: user.department,
+    },
+    jwtSecret,
+    { expiresIn: "1d" }
+  );
+}
+
+function serializeUser(user: InstanceType<typeof User>) {
+  return {
+    id: user._id.toString(),
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    college: user.college,
+    department: user.department,
+    academicYear: user.academicYear,
+    rollNumber: user.rollNumber,
+  };
+}
+
+// Register using email and password
 export const register = async (req: Request, res: Response) => {
   try {
     const {
@@ -15,13 +51,12 @@ export const register = async (req: Request, res: Response) => {
       academicYear,
     } = req.body;
 
-    // Validate required fields
     if (
-      !name ||
-      !email ||
-      !password ||
-      !college ||
-      !department ||
+      typeof name !== "string" ||
+      typeof email !== "string" ||
+      typeof password !== "string" ||
+      typeof college !== "string" ||
+      typeof department !== "string" ||
       academicYear === undefined ||
       academicYear === null ||
       academicYear === ""
@@ -33,20 +68,6 @@ export const register = async (req: Request, res: Response) => {
       });
     }
 
-    // Validate input types
-    if (
-      typeof name !== "string" ||
-      typeof email !== "string" ||
-      typeof password !== "string" ||
-      typeof college !== "string" ||
-      typeof department !== "string"
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid input data",
-      });
-    }
-
     const normalizedName = name.trim();
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedCollege = college.trim();
@@ -55,7 +76,6 @@ export const register = async (req: Request, res: Response) => {
 
     if (
       !normalizedName ||
-      !normalizedEmail ||
       !normalizedCollege ||
       !normalizedDepartment
     ) {
@@ -65,7 +85,6 @@ export const register = async (req: Request, res: Response) => {
       });
     }
 
-    // Validate email format
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       return res.status(400).json({
         success: false,
@@ -73,15 +92,6 @@ export const register = async (req: Request, res: Response) => {
       });
     }
 
-    // Validate academic year
-    if (!Number.isInteger(year) || year < 1 || year > 4) {
-      return res.status(400).json({
-        success: false,
-        message: "Academic year must be between 1 and 4",
-      });
-    }
-
-    // Validate password
     if (password.length < 8) {
       return res.status(400).json({
         success: false,
@@ -89,7 +99,13 @@ export const register = async (req: Request, res: Response) => {
       });
     }
 
-    // Check whether the email already exists
+    if (!Number.isInteger(year) || year < 1 || year > 4) {
+      return res.status(400).json({
+        success: false,
+        message: "Academic year must be between 1 and 4",
+      });
+    }
+
     const existingUser = await User.findOne({
       email: normalizedEmail,
     });
@@ -101,11 +117,8 @@ export const register = async (req: Request, res: Response) => {
       });
     }
 
-    // Hash the password before saving
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Public registration always creates a student account.
-    // Privileged roles must be assigned through a trusted admin process.
     const user = await User.create({
       name: normalizedName,
       email: normalizedEmail,
@@ -119,20 +132,11 @@ export const register = async (req: Request, res: Response) => {
     return res.status(201).json({
       success: true,
       message: "User registered successfully",
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        college: user.college,
-        department: user.department,
-        academicYear: user.academicYear,
-      },
+      user: serializeUser(user),
     });
   } catch (error) {
     console.error("Registration error:", error);
 
-    // Handle duplicate email errors safely
     if (
       typeof error === "object" &&
       error !== null &&
@@ -152,11 +156,11 @@ export const register = async (req: Request, res: Response) => {
   }
 };
 
+// Login using email and password
 export const loginUser = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
 
-    // Validate required fields
     if (
       typeof email !== "string" ||
       typeof password !== "string" ||
@@ -171,19 +175,19 @@ export const loginUser = async (req: Request, res: Response) => {
 
     const normalizedEmail = email.trim().toLowerCase();
 
-    // Find the user
     const user = await User.findOne({
       email: normalizedEmail,
     });
 
-    if (!user) {
+    if (!user || !user.password) {
       return res.status(401).json({
         success: false,
-        message: "Invalid email or password",
+        message: user
+          ? "This account uses Google sign-in. Please continue with Google."
+          : "Invalid email or password",
       });
     }
 
-    // Verify the password
     const isPasswordValid = await bcrypt.compare(
       password,
       user.password
@@ -196,46 +200,13 @@ export const loginUser = async (req: Request, res: Response) => {
       });
     }
 
-    // Ensure the JWT secret is configured
-    const jwtSecret = process.env.JWT_SECRET;
-
-    if (!jwtSecret) {
-      console.error("JWT_SECRET is missing from environment variables");
-
-      return res.status(500).json({
-        success: false,
-        message: "Server configuration error",
-      });
-    }
-
-    // Generate the authentication token
-    const token = jwt.sign(
-      {
-        id: user._id.toString(),
-        email: user.email,
-        role: user.role,
-        department: user.department,
-      },
-      jwtSecret,
-      {
-        expiresIn: "1d",
-      }
-    );
+    const token = createAuthToken(user);
 
     return res.status(200).json({
       success: true,
       message: "Login successful",
       token,
-      user: {
-        id: user._id.toString(),
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        college: user.college,
-        department: user.department,
-        academicYear: user.academicYear,
-        rollNumber: user.rollNumber,
-      },
+      user: serializeUser(user),
     });
   } catch (error) {
     console.error("Login error:", error);
@@ -243,6 +214,128 @@ export const loginUser = async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       message: "Server error during login",
+    });
+  }
+};
+
+// Login or register using Google Identity Services
+export const googleLogin = async (req: Request, res: Response) => {
+  try {
+    const { credential, college, department, academicYear } = req.body;
+
+    if (typeof credential !== "string" || !credential) {
+      return res.status(400).json({
+        success: false,
+        message: "Google credential is required",
+      });
+    }
+
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+
+    if (!clientId || !process.env.JWT_SECRET) {
+      console.error(
+        "GOOGLE_CLIENT_ID or JWT_SECRET is missing from environment variables"
+      );
+
+      return res.status(500).json({
+        success: false,
+        message: "Server configuration error",
+      });
+    }
+
+    // Verify the credential with Google on the backend.
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: clientId,
+    });
+
+    const payload = ticket.getPayload();
+
+    if (
+      !payload?.sub ||
+      !payload.email ||
+      payload.email_verified !== true
+    ) {
+      return res.status(401).json({
+        success: false,
+        message: "Google account could not be verified",
+      });
+    }
+
+    const email = payload.email.trim().toLowerCase();
+
+    // First look for an account already linked to this Google identity.
+    let user = await User.findOne({ googleId: payload.sub });
+
+    if (!user) {
+      // If this verified email already belongs to a user, link the
+      // Google identity to that account rather than creating a duplicate.
+      user = await User.findOne({ email });
+
+      if (user) {
+        if (user.googleId && user.googleId !== payload.sub) {
+          return res.status(409).json({
+            success: false,
+            message:
+              "This email is linked to a different Google account",
+          });
+        }
+
+        user.googleId = payload.sub;
+        await user.save();
+      } else {
+        // New Google users must provide their student profile details.
+        const normalizedCollege =
+          typeof college === "string" ? college.trim() : "";
+        const normalizedDepartment =
+          typeof department === "string" ? department.trim() : "";
+        const year = Number(academicYear);
+
+        if (
+          !normalizedCollege ||
+          !normalizedDepartment ||
+          !Number.isInteger(year) ||
+          year < 1 ||
+          year > 4
+        ) {
+          return res.status(200).json({
+            success: false,
+            needsProfile: true,
+            message:
+              "Complete your student details to create your account",
+            googleUser: {
+              name: payload.name || email.split("@")[0],
+              email,
+            },
+          });
+        }
+
+        user = await User.create({
+          name: payload.name || email.split("@")[0],
+          email,
+          googleId: payload.sub,
+          role: "student",
+          college: normalizedCollege,
+          department: normalizedDepartment,
+          academicYear: year,
+        });
+      }
+    }
+
+    const token = createAuthToken(user);
+
+    return res.status(200).json({
+      success: true,
+      message: "Google login successful",
+      token,
+      user: serializeUser(user),
+    });
+  } catch (error) {
+    console.error("Google login error:", error);
+
+    return res.status(401).json({
+      success: false,
+      message: "Google authentication failed",
     });
   }
 };

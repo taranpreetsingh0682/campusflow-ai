@@ -4,7 +4,8 @@ import mongoose, { Document, Schema } from "mongoose";
 export interface IUser extends Document {
   name: string;
   email: string;
-  password: string;
+  password?: string;
+  googleId?: string;
   role: "admin" | "developer" | "student" | "faculty" | "accounts" | "hod";
   college?: string;
   department?: string;
@@ -19,7 +20,6 @@ const userSchema = new Schema<IUser>(
       required: true,
       trim: true,
     },
-
     email: {
       type: String,
       required: true,
@@ -27,42 +27,40 @@ const userSchema = new Schema<IUser>(
       lowercase: true,
       trim: true,
     },
-
     password: {
       type: String,
-      required: true,
+      required: false,
+      select: true,
     },
-
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
     role: {
       type: String,
       enum: ["admin", "developer", "student", "faculty", "accounts", "hod"],
       default: "student",
     },
-
     college: {
       type: String,
       trim: true,
     },
-
     department: {
       type: String,
       trim: true,
     },
-
     academicYear: {
       type: Number,
       min: 1,
       max: 4,
     },
-
     rollNumber: {
       type: String,
       trim: true,
     },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
 const User = mongoose.model<IUser>("User", userSchema);
