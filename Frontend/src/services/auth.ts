@@ -5,6 +5,9 @@ export type RegisterData = {
   name: string;
   email: string;
   password: string;
+  college: string;
+  department: string;
+  academicYear: string;
 };
 
 export type LoginData = {

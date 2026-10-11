@@ -29,19 +29,43 @@ export default function LoginPage({
     event: React.FormEvent<HTMLFormElement>
   ) {
     event.preventDefault();
+
     setError("");
     setLoading(true);
 
     try {
-      const result = await loginUser({ email, password });
+      const result = await loginUser({
+        email: email.trim(),
+        password,
+      });
 
+      // Debug: inspect the actual backend response.
+      console.log("Full login response:", result);
+
+      if (!result || !result.token || !result.user) {
+        throw new Error(
+          "Login response is missing the token or user. Check the backend response in the Console."
+        );
+      }
+
+      // Save authentication details.
       localStorage.setItem("token", result.token);
-      localStorage.setItem("user", JSON.stringify(result.user));
+      localStorage.setItem(
+        "user",
+        JSON.stringify(result.user)
+      );
 
+      console.log("Login successful. User:", result.user);
+
+      // Notify the parent component to open the dashboard.
       onLoginSuccess(result.user);
     } catch (err) {
+      console.error("Login error:", err);
+
       setError(
-        err instanceof Error ? err.message : "Login failed"
+        err instanceof Error
+          ? err.message
+          : "Something went wrong. Please try again."
       );
     } finally {
       setLoading(false);
@@ -49,7 +73,7 @@ export default function LoginPage({
   }
 
   return (
-    <div className="flex  min-h-screen items-center justify-center bg-slate-100 px-4 py-10">
+    <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10">
       <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-xl shadow-slate-200/60 sm:p-10">
         <div className="mb-8">
           <Logo />
@@ -81,7 +105,10 @@ export default function LoginPage({
           />
 
           {error && (
-            <p className="text-sm text-red-600" role="alert">
+            <p
+              className="text-sm text-red-600"
+              role="alert"
+            >
               {error}
             </p>
           )}

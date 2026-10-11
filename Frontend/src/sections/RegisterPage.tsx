@@ -9,6 +9,24 @@ type RegisterPageProps = {
   onLoginClick: () => void;
 };
 
+const colleges = [
+  "Ambala College of Engineering and Applied Research",
+  "Maharishi Markandeshwar University",
+  "Chandigarh University",
+  "Chitkara University",
+  "Kurukshetra University",
+  "Chandigarh Engineering College",
+];
+
+const departments = [
+  { label: "Artificial Intelligence & Machine Learning", value: "AIML" },
+  { label: "Computer Science & Engineering", value: "CSE" },
+  { label: "Mechanical Engineering", value: "ME" },
+  { label: "Electrical Engineering", value: "EE" },
+  { label: "Automation", value: "AUTO" },
+  { label: "Business Administration (BBA)", value: "BBA" },
+];
+
 export default function RegisterPage({
   onLoginClick,
 }: RegisterPageProps) {
@@ -16,9 +34,16 @@ export default function RegisterPage({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [college, setCollege] = useState("");
+  const [department, setDepartment] = useState("");
+  const [academicYear, setAcademicYear] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const filteredColleges = colleges.filter((item) =>
+    item.toLowerCase().includes(college.trim().toLowerCase())
+  );
 
   async function handleSubmit(
     event: React.FormEvent<HTMLFormElement>
@@ -26,6 +51,18 @@ export default function RegisterPage({
     event.preventDefault();
     setError("");
     setSuccess("");
+
+    if (!colleges.some(
+      (item) => item.toLowerCase() === college.trim().toLowerCase()
+    )) {
+      setError("Please select a college from the suggestions.");
+      return;
+    }
+
+    if (!department || !academicYear) {
+      setError("Please select your department and academic year.");
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
@@ -40,15 +77,26 @@ export default function RegisterPage({
     setLoading(true);
 
     try {
-      await registerUser({ name, email, password });
-      setSuccess("Account created successfully! Please sign in.");
+      await registerUser({
+        name,
+        email,
+        password,
+        department,
+        college,
+        academicYear,
+      });
+
+      setSuccess("Account created! You can now sign in.");
       setName("");
       setEmail("");
       setPassword("");
       setConfirmPassword("");
+      setCollege("");
+      setDepartment("");
+      setAcademicYear("");
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Registration failed"
+        err instanceof Error ? err.message : "Registration failed."
       );
     } finally {
       setLoading(false);
@@ -57,7 +105,7 @@ export default function RegisterPage({
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10">
-      <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-xl shadow-slate-200/60 sm:p-10">
+      <div className="w-full max-w-lg rounded-3xl bg-white p-8 shadow-xl shadow-slate-200/60 sm:p-10">
         <div className="mb-8">
           <Logo />
 
@@ -66,7 +114,7 @@ export default function RegisterPage({
           </h2>
 
           <p className="mt-2 text-sm text-slate-500">
-            Join CampusFlow AI to get started.
+            Join CampusFlow AI to manage your campus journey.
           </p>
         </div>
 
@@ -85,6 +133,84 @@ export default function RegisterPage({
             value={email}
             onChange={setEmail}
           />
+
+          <div>
+            <label
+              htmlFor="college"
+              className="mb-2 block text-sm font-medium text-slate-700"
+            >
+              College name
+            </label>
+
+            <input
+              id="college"
+              type="text"
+              list="college-options"
+              autoComplete="off"
+              placeholder="Start typing your college name..."
+              value={college}
+              onChange={(event) => setCollege(event.target.value)}
+              required
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+            />
+
+            <datalist id="college-options">
+              {filteredColleges.map((item) => (
+                <option key={item} value={item} />
+              ))}
+            </datalist>
+
+            <p className="mt-1 text-xs text-slate-500">
+              Type a few letters and choose a matching college.
+            </p>
+          </div>
+
+          <div>
+            <label
+              htmlFor="department"
+              className="mb-2 block text-sm font-medium text-slate-700"
+            >
+              Department
+            </label>
+
+            <select
+              id="department"
+              value={department}
+              onChange={(event) => setDepartment(event.target.value)}
+              required
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+            >
+              <option value="">Select your department</option>
+              {departments.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label
+              htmlFor="academicYear"
+              className="mb-2 block text-sm font-medium text-slate-700"
+            >
+              Current academic year
+            </label>
+
+            <select
+              id="academicYear"
+              value={academicYear}
+              onChange={(event) => setAcademicYear(event.target.value)}
+              required
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+            >
+              <option value="">Select your year</option>
+              <option value="1">1st Year</option>
+              <option value="2">2nd Year</option>
+              <option value="3">3rd Year</option>
+              <option value="4">4th Year</option>
+            </select>
+          </div>
 
           <InputField
             label="Password"
