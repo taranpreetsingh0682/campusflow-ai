@@ -42,10 +42,42 @@ export async function loginUser(data: LoginData) {
     body: JSON.stringify(data),
   });
 
-  const result = await response.json();
+  console.log("Login HTTP status:", response.status);
+
+  // Read the response safely, including an unexpected empty response.
+  const responseText = await response.text();
+
+  let result: any;
+
+  try {
+    result = responseText ? JSON.parse(responseText) : null;
+  } catch {
+    console.error("Login returned invalid JSON:", responseText);
+    throw new Error("The server returned an invalid response.");
+  }
+
+  console.log("Login API response:", {
+    ...result,
+    token: result?.token ? "[REDACTED]" : undefined,
+  });
 
   if (!response.ok) {
-    throw new Error(result.message || "Login failed");
+    throw new Error(
+      result?.message || `Login failed with status ${response.status}`
+    );
+  }
+
+  if (response.status === 204 || !result) {
+    throw new Error(
+      "The login server returned an empty response. Check the backend login route."
+    );
+  }
+
+  if (!result.token || !result.user) {
+    throw new Error(
+      result.message ||
+        "Login response is missing the authentication token or user details."
+    );
   }
 
   return result;
