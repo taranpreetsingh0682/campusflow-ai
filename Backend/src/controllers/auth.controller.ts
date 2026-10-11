@@ -1,3 +1,4 @@
+
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import User from "../models/User";
@@ -9,21 +10,89 @@ export const register = async (req: Request, res: Response) => {
       name,
       email,
       password,
-      role,
+      college,
       department,
-      rollNumber,
+      academicYear,
     } = req.body;
 
-    // Check required fields
-    if (!name || !email || !password) {
+    // Validate required fields
+    if (
+      !name ||
+      !email ||
+      !password ||
+      !college ||
+      !department ||
+      academicYear === undefined ||
+      academicYear === null ||
+      academicYear === ""
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Name, email and password are required",
+        message:
+          "Name, email, password, college, department and academic year are required",
       });
     }
 
-    // Check if email already exists
-    const existingUser = await User.findOne({ email });
+    // Validate input types
+    if (
+      typeof name !== "string" ||
+      typeof email !== "string" ||
+      typeof password !== "string" ||
+      typeof college !== "string" ||
+      typeof department !== "string"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid input data",
+      });
+    }
+
+    const normalizedName = name.trim();
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedCollege = college.trim();
+    const normalizedDepartment = department.trim();
+    const year = Number(academicYear);
+
+    if (
+      !normalizedName ||
+      !normalizedEmail ||
+      !normalizedCollege ||
+      !normalizedDepartment
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Please complete all required fields",
+      });
+    }
+
+    // Validate email format
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address",
+      });
+    }
+
+    // Validate academic year
+    if (!Number.isInteger(year) || year < 1 || year > 4) {
+      return res.status(400).json({
+        success: false,
+        message: "Academic year must be between 1 and 4",
+      });
+    }
+
+    // Validate password
+    if (password.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must contain at least 8 characters",
+      });
+    }
+
+    // Check whether the email already exists
+    const existingUser = await User.findOne({
+      email: normalizedEmail,
+    });
 
     if (existingUser) {
       return res.status(409).json({
@@ -32,20 +101,21 @@ export const register = async (req: Request, res: Response) => {
       });
     }
 
-    // Hash password
+    // Hash the password before saving
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
+    // Public registration always creates a student account.
+    // Privileged roles must be assigned through a trusted admin process.
     const user = await User.create({
-      name,
-      email,
+      name: normalizedName,
+      email: normalizedEmail,
       password: hashedPassword,
-      role,
-      department,
-      rollNumber,
+      role: "student",
+      college: normalizedCollege,
+      department: normalizedDepartment,
+      academicYear: year,
     });
 
-    // Send response
     return res.status(201).json({
       success: true,
       message: "User registered successfully",
@@ -54,16 +124,30 @@ export const register = async (req: Request, res: Response) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        college: user.college,
         department: user.department,
-        rollNumber: user.rollNumber,
+        academicYear: user.academicYear,
       },
     });
   } catch (error) {
-    console.error("Register error:", error);
+    console.error("Registration error:", error);
+
+    // Handle duplicate email errors safely
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === 11000
+    ) {
+      return res.status(409).json({
+        success: false,
+        message: "User with this email already exists",
+      });
+    }
 
     return res.status(500).json({
       success: false,
-      message: "Server error",
+      message: "Server error during registration",
     });
   }
 };
@@ -72,18 +156,25 @@ export const loginUser = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
 
-    // 1. Check whether email and password were provided
-    if (!email || !password) {
+    // Validate required fields
+    if (
+      typeof email !== "string" ||
+      typeof password !== "string" ||
+      !email.trim() ||
+      !password
+    ) {
       return res.status(400).json({
         success: false,
         message: "Email and password are required",
       });
     }
 
-    // 2. Find user in MongoDB
-    const user = await User.findOne({ email });
-    console.log("Login email:", email);
-    console.log("User found:", user ? "YES" : "NO");
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Find the user
+    const user = await User.findOne({
+      email: normalizedEmail,
+    });
 
     if (!user) {
       return res.status(401).json({
@@ -92,12 +183,11 @@ export const loginUser = async (req: Request, res: Response) => {
       });
     }
 
-    // 3. Compare entered password with hashed password
+    // Verify the password
     const isPasswordValid = await bcrypt.compare(
       password,
       user.password
     );
-    console.log("Password valid:", isPasswordValid);
 
     if (!isPasswordValid) {
       return res.status(401).json({
@@ -106,36 +196,45 @@ export const loginUser = async (req: Request, res: Response) => {
       });
     }
 
-    // 4. Create JWT token
+    // Ensure the JWT secret is configured
+    const jwtSecret = process.env.JWT_SECRET;
 
-    console.log("JWT_SECRET exists:", !!process.env.JWT_SECRET);
+    if (!jwtSecret) {
+      console.error("JWT_SECRET is missing from environment variables");
+
+      return res.status(500).json({
+        success: false,
+        message: "Server configuration error",
+      });
+    }
+
+    // Generate the authentication token
     const token = jwt.sign(
       {
         id: user._id.toString(),
         email: user.email,
         role: user.role,
-        department: user.department?.toString(),
+        department: user.department,
       },
-      process.env.JWT_SECRET as string,
+      jwtSecret,
       {
         expiresIn: "1d",
       }
     );
-console.log("=== NEW JWT CREATED ===");
-console.log("Issued at:", new Date());
-console.log("Expires at:", new Date(Date.now() + 24 * 60 * 60 * 1000));
 
-    // 5. Send successful response
     return res.status(200).json({
       success: true,
       message: "Login successful",
       token,
       user: {
-        id: user._id,
+        id: user._id.toString(),
         name: user.name,
         email: user.email,
         role: user.role,
+        college: user.college,
         department: user.department,
+        academicYear: user.academicYear,
+        rollNumber: user.rollNumber,
       },
     });
   } catch (error) {
@@ -143,7 +242,7 @@ console.log("Expires at:", new Date(Date.now() + 24 * 60 * 60 * 1000));
 
     return res.status(500).json({
       success: false,
-      message: "Server error",
+      message: "Server error during login",
     });
   }
 };
