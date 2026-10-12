@@ -15,31 +15,53 @@ type AppUser = {
   rollNumber?: string;
 };
 
-export default function App() {
-  const [currentPage, setCurrentPage] = useState<
-    "login" | "register" | "dashboard"
-  >("login");
+type Page = "login" | "register" | "dashboard";
 
-  const [currentUser, setCurrentUser] = useState<AppUser | null>(() => {
-    try {
-      const savedUser = localStorage.getItem("user");
-      return savedUser ? (JSON.parse(savedUser) as AppUser) : null;
-    } catch {
-      localStorage.removeItem("user");
+function getSavedUser(): AppUser | null {
+  try {
+    const token = localStorage.getItem("token");
+    const savedUser = localStorage.getItem("user");
+
+    // A user and token must both exist to restore the dashboard.
+    if (!token || !savedUser) {
       return null;
     }
-  });
+
+    return JSON.parse(savedUser) as AppUser;
+  } catch {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    return null;
+  }
+}
+
+export default function App() {
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(
+    () => getSavedUser()
+  );
+
+  const [currentPage, setCurrentPage] = useState<Page>(() =>
+    getSavedUser() ? "dashboard" : "login"
+  );
+
+  function handleLoginSuccess(user: AppUser) {
+    setCurrentUser(user);
+    setCurrentPage("dashboard");
+  }
+
+  function handleLogout() {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+
+    setCurrentUser(null);
+    setCurrentPage("login");
+  }
 
   if (currentPage === "dashboard" && currentUser) {
     return (
       <DashboardPage
         user={currentUser}
-        onLogout={() => {
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
-          setCurrentUser(null);
-          setCurrentPage("login");
-        }}
+        onLogout={handleLogout}
       />
     );
   }
@@ -54,10 +76,7 @@ export default function App() {
 
   return (
     <LoginPage
-      onLoginSuccess={(user) => {
-        setCurrentUser(user as AppUser);
-        setCurrentPage("dashboard");
-      }}
+      onLoginSuccess={handleLoginSuccess}
       onRegisterClick={() => setCurrentPage("register")}
     />
   );
