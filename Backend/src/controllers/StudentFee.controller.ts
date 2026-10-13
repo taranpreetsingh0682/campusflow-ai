@@ -1,5 +1,7 @@
+
 import { Request, Response } from "express";
 import StudentFee from "../models/StudentFee";
+import Student from "../models/Student";
 
 // CREATE STUDENT FEE
 export const createStudentFee = async (
@@ -32,7 +34,12 @@ export const createStudentFee = async (
       return;
     }
 
-    if (totalFee < 0 || scholarshipAmount < 0 || fine < 0 || paidAmount < 0) {
+    if (
+      totalFee < 0 ||
+      scholarshipAmount < 0 ||
+      fine < 0 ||
+      paidAmount < 0
+    ) {
       res.status(400).json({
         success: false,
         message: "Fee amounts cannot be negative",
@@ -95,7 +102,9 @@ export const createStudentFee = async (
       noDues,
     });
 
-    const populatedStudentFee = await StudentFee.findById(studentFee._id)
+    const populatedStudentFee = await StudentFee.findById(
+      studentFee._id
+    )
       .populate("student")
       .populate("feeStructure")
       .populate("scholarship");
@@ -114,6 +123,8 @@ export const createStudentFee = async (
       });
       return;
     }
+
+    console.error("Create student fee error:", error);
 
     res.status(500).json({
       success: false,
@@ -141,10 +152,64 @@ export const getAllStudentFees = async (
       data: studentFees,
     });
   } catch (error: any) {
+    console.error("Get all student fees error:", error);
+
     res.status(500).json({
       success: false,
       message: "Failed to fetch student fees",
       error: error.message,
+    });
+  }
+};
+
+// GET MY STUDENT FEES
+// Requires authentication through the protect middleware on the route.
+export const getMyStudentFees = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const authUser = (req as any).user;
+    const userId = authUser?.id || authUser?._id;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: "Invalid authentication token",
+      });
+      return;
+    }
+
+    const student = await Student.findOne({
+      user: userId,
+    });
+
+    if (!student) {
+      res.status(404).json({
+        success: false,
+        message: "No student profile is linked to this account",
+      });
+      return;
+    }
+
+    const studentFees = await StudentFee.find({
+      student: student._id,
+    })
+      .populate("feeStructure")
+      .populate("scholarship")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: studentFees.length,
+      data: studentFees,
+    });
+  } catch (error: any) {
+    console.error("Get my student fees error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch your fees",
     });
   }
 };
@@ -175,6 +240,8 @@ export const getStudentFeeById = async (
       data: studentFee,
     });
   } catch (error: any) {
+    console.error("Get student fee by ID error:", error);
+
     res.status(500).json({
       success: false,
       message: "Failed to fetch student fee",
@@ -212,12 +279,27 @@ export const updateStudentFee = async (
         : existingFee.scholarshipAmount;
 
     const fine =
-      req.body.fine !== undefined ? req.body.fine : existingFee.fine;
+      req.body.fine !== undefined
+        ? req.body.fine
+        : existingFee.fine;
 
     const paidAmount =
       req.body.paidAmount !== undefined
         ? req.body.paidAmount
         : existingFee.paidAmount;
+
+    if (
+      totalFee < 0 ||
+      scholarshipAmount < 0 ||
+      fine < 0 ||
+      paidAmount < 0
+    ) {
+      res.status(400).json({
+        success: false,
+        message: "Fee amounts cannot be negative",
+      });
+      return;
+    }
 
     const payableAmount = Math.max(
       0,
@@ -272,6 +354,8 @@ export const updateStudentFee = async (
       data: studentFee,
     });
   } catch (error: any) {
+    console.error("Update student fee error:", error);
+
     res.status(500).json({
       success: false,
       message: "Failed to update student fee",
@@ -303,6 +387,8 @@ export const deleteStudentFee = async (
       message: "Student fee deleted successfully",
     });
   } catch (error: any) {
+    console.error("Delete student fee error:", error);
+
     res.status(500).json({
       success: false,
       message: "Failed to delete student fee",
