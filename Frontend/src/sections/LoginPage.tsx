@@ -27,7 +27,7 @@ type GoogleProfile = {
   email: string;
 };
 
-const API_BASE_URL = "http://localhost:5000/api/auth";
+const API_BASE_URL = "https://campusflow-ai-khet.onrender.com/api/auth";
 
 export default function LoginPage({
   onLoginSuccess,

@@ -1,5 +1,5 @@
 
-const API_BASE_URL = "http://localhost:5000/api/auth";
+const API_BASE_URL = "https://campusflow-ai-khet.onrender.com/api";
 
 export type RegisterData = {
   name: string;

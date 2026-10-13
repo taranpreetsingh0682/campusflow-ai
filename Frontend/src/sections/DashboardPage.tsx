@@ -96,7 +96,7 @@ type FeesResponse = {
   data?: StudentFee[];
 };
 
-const API_BASE_URL = "http://localhost:5000/api";
+const API_BASE_URL = "https://campusflow-ai-khet.onrender.com/api";
 
 function formatCurrency(amount: number | undefined) {
   return new Intl.NumberFormat("en-IN", {
