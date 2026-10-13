@@ -14,6 +14,38 @@ type Student = {
   rollNumber?: string;
 };
 
+type FeeStructure = {
+  semester?: number;
+  academicYear?: string;
+  tuitionFee?: number;
+  examFee?: number;
+  libraryFee?: number;
+  otherFee?: number;
+  totalFee?: number;
+  name?: string;
+};
+
+type Scholarship = {
+  name?: string;
+  title?: string;
+  percentage?: number;
+};
+
+type StudentFee = {
+  _id: string;
+  academicYear: string;
+  totalFee: number;
+  scholarshipAmount: number;
+  fine: number;
+  payableAmount: number;
+  paidAmount: number;
+  pendingAmount: number;
+  status: "pending" | "partial" | "paid";
+  noDues: boolean;
+  feeStructure?: FeeStructure;
+  scholarship?: Scholarship | null;
+};
+
 type DashboardPageProps = {
   user: Student;
   onLogout: () => void;
@@ -24,6 +56,23 @@ type ProfileResponse = {
   message?: string;
   user?: Student;
 };
+
+type FeesResponse = {
+  success: boolean;
+  message?: string;
+  count?: number;
+  data?: StudentFee[];
+};
+
+const API_BASE_URL = "http://localhost:5000/api";
+
+function formatCurrency(amount: number | undefined) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2,
+  }).format(amount ?? 0);
+}
 
 function StatCard({
   icon,
@@ -73,6 +122,10 @@ export default function DashboardPage({
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState("");
 
+  const [fees, setFees] = useState<StudentFee[]>([]);
+  const [feesLoading, setFeesLoading] = useState(true);
+  const [feesError, setFeesError] = useState("");
+
   useEffect(() => {
     let cancelled = false;
 
@@ -86,8 +139,7 @@ export default function DashboardPage({
       }
 
       try {
-        const response = await fetch("http://localhost:5000/api/profile", {
-          method: "GET",
+        const response = await fetch(`${API_BASE_URL}/profile`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -97,7 +149,9 @@ export default function DashboardPage({
 
         if (!response.ok || !result.success || !result.user) {
           if (response.status === 401) {
-            throw new Error("Your session is invalid or expired. Please sign in again.");
+            throw new Error(
+              "Your session is invalid or expired. Please sign in again."
+            );
           }
 
           throw new Error(result.message || "Failed to load your profile.");
@@ -130,6 +184,64 @@ export default function DashboardPage({
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchMyFees() {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        setFeesError("Please sign in again to view your fees.");
+        setFeesLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/student-fees/my-fees`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const result: FeesResponse = await response.json();
+
+        if (!response.ok || !result.success) {
+          if (response.status === 401) {
+            throw new Error(
+              "Your session is invalid or expired. Please sign in again."
+            );
+          }
+
+          throw new Error(result.message || "Could not load your fee records.");
+        }
+
+        if (!cancelled) {
+          setFees(Array.isArray(result.data) ? result.data : []);
+          setFeesError("");
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setFeesError(
+            error instanceof Error
+              ? error.message
+              : "Could not connect to the fees API."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setFeesLoading(false);
+        }
+      }
+    }
+
+    void fetchMyFees();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const firstName = profile.name?.trim().split(/\s+/)[0] || "Student";
 
   const initials = (profile.name || "Student")
@@ -146,6 +258,31 @@ export default function DashboardPage({
 
   const isAdmin = profile.role?.toLowerCase() === "admin";
   const portalTitle = isAdmin ? "Admin Portal" : "Student Portal";
+
+  const totalPayable = fees.reduce(
+    (sum, fee) => sum + (fee.payableAmount ?? 0),
+    0
+  );
+
+  const totalPaid = fees.reduce(
+    (sum, fee) => sum + (fee.paidAmount ?? 0),
+    0
+  );
+
+  const totalPending = fees.reduce(
+    (sum, fee) => sum + (fee.pendingAmount ?? 0),
+    0
+  );
+
+  const totalScholarship = fees.reduce(
+    (sum, fee) => sum + (fee.scholarshipAmount ?? 0),
+    0
+  );
+
+  const totalFines = fees.reduce(
+    (sum, fee) => sum + (fee.fine ?? 0),
+    0
+  );
 
   const quickLinks = [
     { icon: "📅", title: "Attendance", description: "Track your classes" },
@@ -304,6 +441,7 @@ export default function DashboardPage({
                   {isAdmin ? "Administrator summary" : "Student summary"}
                 </span>
               </div>
+
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <StatCard
                   icon="📅"
@@ -311,26 +449,237 @@ export default function DashboardPage({
                   value="--"
                   detail="Attendance data not connected yet"
                 />
+
                 <StatCard
                   icon="💳"
-                  label="Semester fees"
-                  value="--"
-                  detail="Fee data not connected yet"
+                  label="Total payable"
+                  value={
+                    feesLoading
+                      ? "Loading..."
+                      : feesError
+                        ? "--"
+                        : formatCurrency(totalPayable)
+                  }
+                  detail={
+                    feesLoading
+                      ? "Fetching your fee records"
+                      : feesError
+                        ? "Unable to load fee data"
+                        : `${fees.length} fee record(s)`
+                  }
                 />
+
                 <StatCard
-                  icon="🎓"
-                  label="Scholarships"
-                  value="--"
-                  detail="Scholarship data not connected yet"
+                  icon="💰"
+                  label="Amount paid"
+                  value={
+                    feesLoading || feesError ? "--" : formatCurrency(totalPaid)
+                  }
+                  detail="Payments recorded in your fee records"
                 />
+
                 <StatCard
-                  icon="📝"
-                  label="Academic results"
-                  value="--"
-                  detail="Results data not connected yet"
+                  icon="⏳"
+                  label="Amount pending"
+                  value={
+                    feesLoading || feesError
+                      ? "--"
+                      : formatCurrency(totalPending)
+                  }
+                  detail="Outstanding fee balance"
                 />
               </div>
             </section>
+
+            <Section title="Semester fees & payments">
+              {feesLoading && (
+                <p className="text-sm text-slate-500">
+                  Loading your fee details from the server...
+                </p>
+              )}
+
+              {feesError && (
+                <div
+                  role="alert"
+                  className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+                >
+                  <p className="font-semibold">Could not load your fees</p>
+                  <p className="mt-1">{feesError}</p>
+                  <button
+                    type="button"
+                    onClick={() => window.location.reload()}
+                    className="mt-3 rounded-lg border border-red-200 bg-white px-3 py-2 font-semibold hover:bg-red-100"
+                  >
+                    Try again
+                  </button>
+                </div>
+              )}
+
+              {!feesLoading && !feesError && fees.length === 0 && (
+                <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center">
+                  <p className="font-semibold text-slate-800">
+                    No fee records found
+                  </p>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Your account does not have any linked student fee records
+                    yet. Contact the college accounts department if this seems
+                    incorrect.
+                  </p>
+                </div>
+              )}
+
+              {!feesLoading && !feesError && fees.length > 0 && (
+                <>
+                  <div className="mb-5 grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl bg-indigo-50 p-4">
+                      <p className="text-sm text-indigo-700">
+                        Scholarship deduction
+                      </p>
+                      <p className="mt-2 text-xl font-bold text-indigo-950">
+                        {formatCurrency(totalScholarship)}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl bg-amber-50 p-4">
+                      <p className="text-sm text-amber-700">Total fines</p>
+                      <p className="mt-2 text-xl font-bold text-amber-950">
+                        {formatCurrency(totalFines)}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl bg-emerald-50 p-4">
+                      <p className="text-sm text-emerald-700">No-dues status</p>
+                      <p className="mt-2 text-xl font-bold text-emerald-950">
+                        {fees.every((fee) => fee.noDues) ? "Cleared" : "Pending"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    {fees.map((fee) => (
+                      <article
+                        key={fee._id}
+                        className="rounded-xl border border-slate-200 p-4 sm:p-5"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <h3 className="font-bold text-slate-900">
+                              {fee.feeStructure?.semester
+                                ? `Semester ${fee.feeStructure.semester}`
+                                : "Semester fee"}
+                            </h3>
+                            <p className="mt-1 text-sm text-slate-500">
+                              Academic year: {fee.academicYear}
+                            </p>
+                            {fee.scholarship && (
+                              <p className="mt-1 text-sm text-indigo-700">
+                                Scholarship:{" "}
+                                {fee.scholarship.name ||
+                                  fee.scholarship.title ||
+                                  "Applied"}
+                              </p>
+                            )}
+                          </div>
+
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${
+                              fee.status === "paid"
+                                ? "bg-emerald-100 text-emerald-700"
+                                : fee.status === "partial"
+                                  ? "bg-amber-100 text-amber-700"
+                                  : "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {fee.status}
+                          </span>
+                        </div>
+
+                        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                          <div>
+                            <p className="text-xs text-slate-500">
+                              Original fee
+                            </p>
+                            <p className="mt-1 font-semibold">
+                              {formatCurrency(fee.totalFee)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-500">
+                              Scholarship deduction
+                            </p>
+                            <p className="mt-1 font-semibold text-emerald-700">
+                              − {formatCurrency(fee.scholarshipAmount)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-500">Fine</p>
+                            <p className="mt-1 font-semibold">
+                              {formatCurrency(fee.fine)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-500">
+                              Total payable
+                            </p>
+                            <p className="mt-1 font-semibold">
+                              {formatCurrency(fee.payableAmount)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-500">Amount paid</p>
+                            <p className="mt-1 font-semibold text-emerald-700">
+                              {formatCurrency(fee.paidAmount)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-500">
+                              Amount pending
+                            </p>
+                            <p className="mt-1 font-semibold text-red-700">
+                              {formatCurrency(fee.pendingAmount)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-5">
+                          <div className="mb-2 flex justify-between text-xs text-slate-500">
+                            <span>Payment progress</span>
+                            <span>
+                              {fee.payableAmount > 0
+                                ? Math.min(
+                                    100,
+                                    Math.round(
+                                      (fee.paidAmount / fee.payableAmount) *
+                                        100
+                                    )
+                                  )
+                                : 100}
+                              %
+                            </span>
+                          </div>
+                          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                            <div
+                              className="h-full rounded-full bg-indigo-600 transition-all"
+                              style={{
+                                width: `${
+                                  fee.payableAmount > 0
+                                    ? Math.min(
+                                        100,
+                                        (fee.paidAmount / fee.payableAmount) *
+                                          100
+                                      )
+                                    : 100
+                                }%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </>
+              )}
+            </Section>
 
             <section>
               <h2 className="mb-4 text-xl font-bold text-slate-900">
