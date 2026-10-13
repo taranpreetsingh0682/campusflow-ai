@@ -11,6 +11,11 @@ export interface IUser extends Document {
   department?: string;
   academicYear?: number;
   rollNumber?: string;
+
+  // Password recovery fields
+  passwordResetToken?: string;
+  passwordResetExpires?: Date;
+  passwordResetAttempts?: number;
 }
 
 const userSchema = new Schema<IUser>(
@@ -58,6 +63,21 @@ const userSchema = new Schema<IUser>(
     rollNumber: {
       type: String,
       trim: true,
+    },
+
+    // Password recovery
+    passwordResetToken: {
+      type: String,
+      select: false,
+    },
+    passwordResetExpires: {
+      type: Date,
+      select: false,
+    },
+    passwordResetAttempts: {
+      type: Number,
+      default: 0,
+      select: false,
     },
   },
   { timestamps: true }

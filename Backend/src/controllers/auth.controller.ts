@@ -4,6 +4,8 @@ import bcrypt from "bcryptjs";
 import User from "../models/User";
 import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
+import { Resend } from "resend";
+import { createHash, randomBytes } from "crypto";
 
 const googleClient = new OAuth2Client();
 
@@ -74,11 +76,7 @@ export const register = async (req: Request, res: Response) => {
     const normalizedDepartment = department.trim();
     const year = Number(academicYear);
 
-    if (
-      !normalizedName ||
-      !normalizedCollege ||
-      !normalizedDepartment
-    ) {
+    if (!normalizedName || !normalizedCollege || !normalizedDepartment) {
       return res.status(400).json({
         success: false,
         message: "Please complete all required fields",
@@ -243,7 +241,6 @@ export const googleLogin = async (req: Request, res: Response) => {
       });
     }
 
-    // Verify the credential with Google on the backend.
     const ticket = await googleClient.verifyIdToken({
       idToken: credential,
       audience: clientId,
@@ -264,12 +261,9 @@ export const googleLogin = async (req: Request, res: Response) => {
 
     const email = payload.email.trim().toLowerCase();
 
-    // First look for an account already linked to this Google identity.
     let user = await User.findOne({ googleId: payload.sub });
 
     if (!user) {
-      // If this verified email already belongs to a user, link the
-      // Google identity to that account rather than creating a duplicate.
       user = await User.findOne({ email });
 
       if (user) {
@@ -284,7 +278,6 @@ export const googleLogin = async (req: Request, res: Response) => {
         user.googleId = payload.sub;
         await user.save();
       } else {
-        // New Google users must provide their student profile details.
         const normalizedCollege =
           typeof college === "string" ? college.trim() : "";
         const normalizedDepartment =
@@ -336,6 +329,189 @@ export const googleLogin = async (req: Request, res: Response) => {
     return res.status(401).json({
       success: false,
       message: "Google authentication failed",
+    });
+  }
+};
+
+// Request a password reset email
+export const forgotPassword = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+
+    if (typeof email !== "string" || !email.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const apiKey = process.env.RESEND_API_KEY;
+
+    if (!apiKey) {
+      console.error("RESEND_API_KEY is missing from environment variables");
+
+      return res.status(500).json({
+        success: false,
+        message: "Email service is not configured",
+      });
+    }
+
+    const user = await User.findOne({
+      email: normalizedEmail,
+    }).select(
+      "+passwordResetToken +passwordResetExpires +passwordResetAttempts"
+    );
+
+    // Use the same response for existing and unknown email addresses.
+    const genericMessage =
+      "If an account exists for this email, password reset instructions will be sent.";
+
+    if (!user) {
+      return res.status(200).json({
+        success: true,
+        message: genericMessage,
+      });
+    }
+
+    // Generate a cryptographically secure, single-use token.
+    const rawToken = randomBytes(32).toString("hex");
+    const hashedToken = createHash("sha256")
+      .update(rawToken)
+      .digest("hex");
+
+    user.passwordResetToken = hashedToken;
+    user.passwordResetExpires = new Date(Date.now() + 15 * 60 * 1000);
+    user.passwordResetAttempts = 0;
+
+    await user.save();
+
+    const resend = new Resend(apiKey);
+
+    const { error } = await resend.emails.send({
+      from: "CampusFlow AI <onboarding@resend.dev>",
+      to: [normalizedEmail],
+      subject: "Reset your CampusFlow AI password",
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto">
+          <h2>Reset your CampusFlow AI password</h2>
+          <p>We received a request to reset the password for your account.</p>
+          <p>Your password reset token is:</p>
+          <p style="font-size:18px;font-weight:bold;word-break:break-all">
+            ${rawToken}
+          </p>
+          <p>This token expires in 15 minutes and can only be used once.</p>
+          <p>If you did not request this reset, you can ignore this email.</p>
+        </div>
+      `,
+    });
+
+    if (error) {
+      console.error("Resend email error:", error);
+
+      user.passwordResetToken = undefined;
+      user.passwordResetExpires = undefined;
+      user.passwordResetAttempts = 0;
+      await user.save();
+
+      return res.status(502).json({
+        success: false,
+        message:
+          "Unable to send the reset email. Please try again later.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: genericMessage,
+    });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error while requesting password reset",
+    });
+  }
+};
+
+// Reset password using email and the emailed token
+export const resetPassword = async (req: Request, res: Response) => {
+  try {
+    const { email, token, newPassword } = req.body;
+
+    if (
+      typeof email !== "string" ||
+      typeof token !== "string" ||
+      typeof newPassword !== "string" ||
+      !email.trim() ||
+      !token.trim() ||
+      !newPassword
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Email, reset token and new password are required",
+      });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must contain at least 8 characters",
+      });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const user = await User.findOne({
+      email: normalizedEmail,
+    }).select(
+      "+passwordResetToken +passwordResetExpires +passwordResetAttempts"
+    );
+
+    if (
+      !user ||
+      !user.passwordResetToken ||
+      !user.passwordResetExpires ||
+      user.passwordResetExpires.getTime() <= Date.now()
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired password reset token",
+      });
+    }
+
+    const submittedTokenHash = createHash("sha256")
+      .update(token.trim())
+      .digest("hex");
+
+    if (submittedTokenHash !== user.passwordResetToken) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired password reset token",
+      });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+
+    // Invalidate the token immediately after a successful reset.
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    user.passwordResetAttempts = 0;
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Password reset successfully. You can now sign in.",
+    });
+  } catch (error) {
+    console.error("Reset password error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error while resetting password",
     });
   }
 };
