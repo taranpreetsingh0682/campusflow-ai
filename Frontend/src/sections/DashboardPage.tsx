@@ -12,6 +12,11 @@ type Student = {
   department?: string;
   academicYear?: number | string;
   rollNumber?: string;
+  studentId?: string;
+  student?: {
+    _id?: string;
+    id?: string;
+  };
 };
 
 type FeeStructure = {
@@ -46,6 +51,31 @@ type StudentFee = {
   scholarship?: Scholarship | null;
 };
 
+type AttendanceRecord = {
+  _id: string;
+  date: string;
+  status: "present" | "absent";
+  subject?: {
+    _id: string;
+    name?: string;
+    code?: string;
+  };
+  faculty?: {
+    employeeId?: string;
+  };
+};
+
+type AttendanceResponse = {
+  success: boolean;
+  message?: string;
+  count?: number;
+  totalClasses?: number;
+  presentClasses?: number;
+  absentClasses?: number;
+  attendancePercentage?: number;
+  data?: AttendanceRecord[];
+};
+
 type DashboardPageProps = {
   user: Student;
   onLogout: () => void;
@@ -55,6 +85,8 @@ type ProfileResponse = {
   success: boolean;
   message?: string;
   user?: Student;
+  student?: Student;
+  data?: Student;
 };
 
 type FeesResponse = {
@@ -72,6 +104,19 @@ function formatCurrency(amount: number | undefined) {
     currency: "INR",
     maximumFractionDigits: 2,
   }).format(amount ?? 0);
+}
+
+function getStudentId(...candidates: (Student | undefined)[]): string {
+  for (const candidate of candidates) {
+    const id =
+      candidate?.studentId ||
+      candidate?.student?._id ||
+      candidate?.student?.id;
+
+    if (id) return id;
+  }
+
+  return "";
 }
 
 function StatCard({
@@ -126,6 +171,14 @@ export default function DashboardPage({
   const [feesLoading, setFeesLoading] = useState(true);
   const [feesError, setFeesError] = useState("");
 
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+  const [attendanceLoading, setAttendanceLoading] = useState(true);
+  const [attendanceError, setAttendanceError] = useState("");
+  const [attendancePercentage, setAttendancePercentage] = useState(0);
+  const [totalClasses, setTotalClasses] = useState(0);
+  const [presentClasses, setPresentClasses] = useState(0);
+  const [absentClasses, setAbsentClasses] = useState(0);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -140,27 +193,30 @@ export default function DashboardPage({
 
       try {
         const response = await fetch(`${API_BASE_URL}/profile`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         });
 
         const result: ProfileResponse = await response.json();
 
-        if (!response.ok || !result.success || !result.user) {
+        if (!response.ok || !result.success) {
           if (response.status === 401) {
             throw new Error(
               "Your session is invalid or expired. Please sign in again."
             );
           }
-
           throw new Error(result.message || "Failed to load your profile.");
         }
 
+        const latestProfile = result.user || result.student || result.data;
+
+        if (!latestProfile) {
+          throw new Error("The profile API did not return user details.");
+        }
+
         if (!cancelled) {
-          setProfile(result.user);
+          setProfile(latestProfile);
           setProfileError("");
-          localStorage.setItem("user", JSON.stringify(result.user));
+          localStorage.setItem("user", JSON.stringify(latestProfile));
         }
       } catch (error) {
         if (!cancelled) {
@@ -171,9 +227,7 @@ export default function DashboardPage({
           );
         }
       } finally {
-        if (!cancelled) {
-          setProfileLoading(false);
-        }
+        if (!cancelled) setProfileLoading(false);
       }
     }
 
@@ -199,9 +253,7 @@ export default function DashboardPage({
       try {
         const response = await fetch(`${API_BASE_URL}/student-fees/my-fees`, {
           method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         });
 
         const result: FeesResponse = await response.json();
@@ -212,7 +264,6 @@ export default function DashboardPage({
               "Your session is invalid or expired. Please sign in again."
             );
           }
-
           throw new Error(result.message || "Could not load your fee records.");
         }
 
@@ -229,9 +280,7 @@ export default function DashboardPage({
           );
         }
       } finally {
-        if (!cancelled) {
-          setFeesLoading(false);
-        }
+        if (!cancelled) setFeesLoading(false);
       }
     }
 
@@ -241,6 +290,79 @@ export default function DashboardPage({
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchMyAttendance() {
+      setAttendanceLoading(true);
+      setAttendanceError("");
+
+      try {
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+          throw new Error("Please sign in again to view attendance.");
+        }
+
+        const storedUser = localStorage.getItem("user");
+        const parsedUser: Student | undefined = storedUser
+          ? (JSON.parse(storedUser) as Student)
+          : undefined;
+
+        const studentId = getStudentId(profile, parsedUser, user);
+
+        if (!studentId) {
+          throw new Error(
+            "Student ID is missing from your profile. We need to link your login account to its Student record in the backend."
+          );
+        }
+
+        const response = await fetch(
+          `${API_BASE_URL}/attendance/student/${encodeURIComponent(studentId)}`,
+          {
+            method: "GET",
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        const result: AttendanceResponse = await response.json();
+
+        if (!response.ok || !result.success) {
+          if (response.status === 401) {
+            throw new Error(
+              "Your session is invalid or expired. Please sign in again."
+            );
+          }
+          throw new Error(result.message || "Could not load attendance.");
+        }
+
+        if (!cancelled) {
+          setAttendance(Array.isArray(result.data) ? result.data : []);
+          setTotalClasses(result.totalClasses ?? 0);
+          setPresentClasses(result.presentClasses ?? 0);
+          setAbsentClasses(result.absentClasses ?? 0);
+          setAttendancePercentage(result.attendancePercentage ?? 0);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setAttendanceError(
+            error instanceof Error
+              ? error.message
+              : "Could not connect to the attendance API."
+          );
+        }
+      } finally {
+        if (!cancelled) setAttendanceLoading(false);
+      }
+    }
+
+    void fetchMyAttendance();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile, user]);
 
   const firstName = profile.name?.trim().split(/\s+/)[0] || "Student";
 
@@ -263,22 +385,18 @@ export default function DashboardPage({
     (sum, fee) => sum + (fee.payableAmount ?? 0),
     0
   );
-
   const totalPaid = fees.reduce(
     (sum, fee) => sum + (fee.paidAmount ?? 0),
     0
   );
-
   const totalPending = fees.reduce(
     (sum, fee) => sum + (fee.pendingAmount ?? 0),
     0
   );
-
   const totalScholarship = fees.reduce(
     (sum, fee) => sum + (fee.scholarshipAmount ?? 0),
     0
   );
-
   const totalFines = fees.reduce(
     (sum, fee) => sum + (fee.fine ?? 0),
     0
@@ -351,9 +469,7 @@ export default function DashboardPage({
         <main className="min-w-0 flex-1">
           <header className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4 sm:px-8">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">
-                {portalTitle}
-              </h2>
+              <h2 className="text-lg font-bold text-slate-900">{portalTitle}</h2>
               <p className="text-xs text-slate-500">
                 Your campus, all in one place
               </p>
@@ -361,9 +477,7 @@ export default function DashboardPage({
 
             <div className="flex items-center gap-3">
               <div className="hidden text-right sm:block">
-                <p className="text-sm font-semibold">
-                  {profile.name || "User"}
-                </p>
+                <p className="text-sm font-semibold">{profile.name || "User"}</p>
                 <p className="text-xs capitalize text-slate-500">
                   {profile.role || "student"}
                 </p>
@@ -446,8 +560,20 @@ export default function DashboardPage({
                 <StatCard
                   icon="📅"
                   label="Attendance"
-                  value="--"
-                  detail="Attendance data not connected yet"
+                  value={
+                    attendanceLoading
+                      ? "Loading..."
+                      : attendanceError
+                        ? "--"
+                        : `${attendancePercentage}%`
+                  }
+                  detail={
+                    attendanceLoading
+                      ? "Fetching attendance"
+                      : attendanceError
+                        ? "Unable to load attendance"
+                        : `${presentClasses} present out of ${totalClasses} classes`
+                  }
                 />
 
                 <StatCard
@@ -472,9 +598,7 @@ export default function DashboardPage({
                 <StatCard
                   icon="💰"
                   label="Amount paid"
-                  value={
-                    feesLoading || feesError ? "--" : formatCurrency(totalPaid)
-                  }
+                  value={feesLoading || feesError ? "--" : formatCurrency(totalPaid)}
                   detail="Payments recorded in your fee records"
                 />
 
@@ -482,14 +606,126 @@ export default function DashboardPage({
                   icon="⏳"
                   label="Amount pending"
                   value={
-                    feesLoading || feesError
-                      ? "--"
-                      : formatCurrency(totalPending)
+                    feesLoading || feesError ? "--" : formatCurrency(totalPending)
                   }
                   detail="Outstanding fee balance"
                 />
               </div>
             </section>
+
+            <Section title="Attendance report">
+              {attendanceLoading && (
+                <p className="text-sm text-slate-500">
+                  Loading attendance from the server...
+                </p>
+              )}
+
+              {attendanceError && (
+                <div
+                  role="alert"
+                  className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"
+                >
+                  <p className="font-semibold">Attendance unavailable</p>
+                  <p className="mt-1">{attendanceError}</p>
+                  <button
+                    type="button"
+                    onClick={() => window.location.reload()}
+                    className="mt-3 rounded-lg border border-amber-200 bg-white px-3 py-2 font-semibold hover:bg-amber-100"
+                  >
+                    Try again
+                  </button>
+                </div>
+              )}
+
+              {!attendanceLoading && !attendanceError && (
+                <>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl bg-indigo-50 p-4">
+                      <p className="text-sm text-indigo-700">Total classes</p>
+                      <p className="mt-2 text-2xl font-bold text-indigo-950">
+                        {totalClasses}
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-emerald-50 p-4">
+                      <p className="text-sm text-emerald-700">Present</p>
+                      <p className="mt-2 text-2xl font-bold text-emerald-950">
+                        {presentClasses}
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-red-50 p-4">
+                      <p className="text-sm text-red-700">Absent</p>
+                      <p className="mt-2 text-2xl font-bold text-red-950">
+                        {absentClasses}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5">
+                    <div className="mb-2 flex justify-between text-sm">
+                      <span className="font-medium text-slate-600">
+                        Overall attendance
+                      </span>
+                      <span className="font-bold text-indigo-700">
+                        {attendancePercentage}%
+                      </span>
+                    </div>
+                    <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full bg-indigo-600 transition-all"
+                        style={{
+                          width: `${Math.min(100, Math.max(0, attendancePercentage))}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <h3 className="mb-3 mt-6 font-bold text-slate-900">
+                    Class attendance history
+                  </h3>
+
+                  {attendance.length === 0 ? (
+                    <p className="rounded-xl border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500">
+                      No attendance records found.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {attendance.map((record) => (
+                        <article
+                          key={record._id}
+                          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4"
+                        >
+                          <div>
+                            <p className="font-semibold text-slate-900">
+                              {record.subject?.name || "Class"}
+                            </p>
+                            <p className="mt-1 text-sm text-slate-500">
+                              {record.subject?.code || "Subject code unavailable"}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {new Date(record.date).toLocaleDateString("en-IN", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                                timeZone: "UTC",
+                              })}
+                            </p>
+                          </div>
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${
+                              record.status === "present"
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {record.status}
+                          </span>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </Section>
 
             <Section title="Semester fees & payments">
               {feesLoading && (
@@ -539,14 +775,12 @@ export default function DashboardPage({
                         {formatCurrency(totalScholarship)}
                       </p>
                     </div>
-
                     <div className="rounded-xl bg-amber-50 p-4">
                       <p className="text-sm text-amber-700">Total fines</p>
                       <p className="mt-2 text-xl font-bold text-amber-950">
                         {formatCurrency(totalFines)}
                       </p>
                     </div>
-
                     <div className="rounded-xl bg-emerald-50 p-4">
                       <p className="text-sm text-emerald-700">No-dues status</p>
                       <p className="mt-2 text-xl font-bold text-emerald-950">
@@ -580,7 +814,6 @@ export default function DashboardPage({
                               </p>
                             )}
                           </div>
-
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${
                               fee.status === "paid"
@@ -596,9 +829,7 @@ export default function DashboardPage({
 
                         <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                           <div>
-                            <p className="text-xs text-slate-500">
-                              Original fee
-                            </p>
+                            <p className="text-xs text-slate-500">Original fee</p>
                             <p className="mt-1 font-semibold">
                               {formatCurrency(fee.totalFee)}
                             </p>
@@ -618,9 +849,7 @@ export default function DashboardPage({
                             </p>
                           </div>
                           <div>
-                            <p className="text-xs text-slate-500">
-                              Total payable
-                            </p>
+                            <p className="text-xs text-slate-500">Total payable</p>
                             <p className="mt-1 font-semibold">
                               {formatCurrency(fee.payableAmount)}
                             </p>
@@ -632,9 +861,7 @@ export default function DashboardPage({
                             </p>
                           </div>
                           <div>
-                            <p className="text-xs text-slate-500">
-                              Amount pending
-                            </p>
+                            <p className="text-xs text-slate-500">Amount pending</p>
                             <p className="mt-1 font-semibold text-red-700">
                               {formatCurrency(fee.pendingAmount)}
                             </p>
@@ -649,8 +876,7 @@ export default function DashboardPage({
                                 ? Math.min(
                                     100,
                                     Math.round(
-                                      (fee.paidAmount / fee.payableAmount) *
-                                        100
+                                      (fee.paidAmount / fee.payableAmount) * 100
                                     )
                                   )
                                 : 100}
@@ -665,8 +891,7 @@ export default function DashboardPage({
                                   fee.payableAmount > 0
                                     ? Math.min(
                                         100,
-                                        (fee.paidAmount / fee.payableAmount) *
-                                          100
+                                        (fee.paidAmount / fee.payableAmount) * 100
                                       )
                                     : 100
                                 }%`,
@@ -776,8 +1001,7 @@ export default function DashboardPage({
             </div>
 
             <footer className="pb-2 text-center text-xs text-slate-400">
-              © {new Date().getFullYear()} CampusFlow AI · Smart Campus
-              Management
+              © {new Date().getFullYear()} CampusFlow AI · Smart Campus Management
             </footer>
           </div>
         </main>
