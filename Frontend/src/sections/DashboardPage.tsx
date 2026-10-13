@@ -1,8 +1,10 @@
 
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
 type Student = {
   id?: string;
+  _id?: string;
   name?: string;
   email?: string;
   role?: string;
@@ -15,6 +17,12 @@ type Student = {
 type DashboardPageProps = {
   user: Student;
   onLogout: () => void;
+};
+
+type ProfileResponse = {
+  success: boolean;
+  message?: string;
+  user?: Student;
 };
 
 function StatCard({
@@ -61,17 +69,83 @@ export default function DashboardPage({
   user,
   onLogout,
 }: DashboardPageProps) {
-  const firstName = user.name?.trim().split(/\s+/)[0] || "Student";
-  const initials = (user.name || "Student")
-    .split(" ")
+  const [profile, setProfile] = useState<Student>(user);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchProfile() {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        setProfileError("Your login token is missing. Please sign in again.");
+        setProfileLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch("http://localhost:5000/api/profile", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const result: ProfileResponse = await response.json();
+
+        if (!response.ok || !result.success || !result.user) {
+          if (response.status === 401) {
+            throw new Error("Your session is invalid or expired. Please sign in again.");
+          }
+
+          throw new Error(result.message || "Failed to load your profile.");
+        }
+
+        if (!cancelled) {
+          setProfile(result.user);
+          setProfileError("");
+          localStorage.setItem("user", JSON.stringify(result.user));
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setProfileError(
+            error instanceof Error
+              ? error.message
+              : "Could not connect to the profile API."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setProfileLoading(false);
+        }
+      }
+    }
+
+    void fetchProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const firstName = profile.name?.trim().split(/\s+/)[0] || "Student";
+
+  const initials = (profile.name || "Student")
+    .trim()
+    .split(/\s+/)
     .map((part) => part[0])
     .slice(0, 2)
     .join("")
     .toUpperCase();
 
-  const academicYear = user.academicYear
-    ? `Year ${user.academicYear}`
-    : "Student";
+  const academicYear = profile.academicYear
+    ? `Year ${profile.academicYear}`
+    : "Year not set";
+
+  const isAdmin = profile.role?.toLowerCase() === "admin";
+  const portalTitle = isAdmin ? "Admin Portal" : "Student Portal";
 
   const quickLinks = [
     { icon: "📅", title: "Attendance", description: "Track your classes" },
@@ -97,7 +171,7 @@ export default function DashboardPage({
           </div>
 
           <p className="mb-3 mt-10 px-3 text-xs font-semibold uppercase tracking-widest text-slate-500">
-            Student menu
+            {isAdmin ? "Admin menu" : "Student menu"}
           </p>
 
           <nav className="space-y-2">
@@ -127,7 +201,9 @@ export default function DashboardPage({
           <div className="mt-auto rounded-2xl border border-slate-800 bg-slate-900 p-4">
             <p className="text-sm font-semibold">Need help?</p>
             <p className="mt-1 text-xs leading-5 text-slate-400">
-              Raise a complaint to get support from your campus team.
+              {isAdmin
+                ? "Manage campus information and support requests."
+                : "Raise a complaint to get support from your campus team."}
             </p>
             <p className="mt-3 text-xs font-semibold text-indigo-300">
               Campus support
@@ -139,7 +215,7 @@ export default function DashboardPage({
           <header className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4 sm:px-8">
             <div>
               <h2 className="text-lg font-bold text-slate-900">
-                Student Portal
+                {portalTitle}
               </h2>
               <p className="text-xs text-slate-500">
                 Your campus, all in one place
@@ -148,8 +224,12 @@ export default function DashboardPage({
 
             <div className="flex items-center gap-3">
               <div className="hidden text-right sm:block">
-                <p className="text-sm font-semibold">{user.name || "Student"}</p>
-                <p className="text-xs text-slate-500">{user.role || "student"}</p>
+                <p className="text-sm font-semibold">
+                  {profile.name || "User"}
+                </p>
+                <p className="text-xs capitalize text-slate-500">
+                  {profile.role || "student"}
+                </p>
               </div>
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 font-bold text-indigo-700">
                 {initials}
@@ -165,27 +245,51 @@ export default function DashboardPage({
           </header>
 
           <div className="mx-auto max-w-7xl space-y-7 p-5 sm:p-8">
+            {profileLoading && (
+              <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-4 text-sm text-indigo-700">
+                Loading your latest profile...
+              </div>
+            )}
+
+            {profileError && (
+              <div
+                role="alert"
+                className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+              >
+                <p className="font-semibold">Could not refresh your profile</p>
+                <p className="mt-1">{profileError}</p>
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="mt-3 rounded-lg border border-red-200 bg-white px-3 py-2 font-semibold hover:bg-red-100"
+                >
+                  Try again
+                </button>
+              </div>
+            )}
+
             <section className="overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-700 via-indigo-600 to-violet-600 p-6 text-white shadow-lg sm:p-8">
               <p className="text-sm font-medium text-indigo-100">
-                YOUR STUDENT DASHBOARD
+                {isAdmin ? "YOUR ADMIN DASHBOARD" : "YOUR STUDENT DASHBOARD"}
               </p>
               <h1 className="mt-3 text-3xl font-bold sm:text-4xl">
                 Welcome back, {firstName}! 👋
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-indigo-100 sm:text-base">
-                Stay on top of your attendance, fees, academic progress, and
-                campus updates — all from one place.
+                {isAdmin
+                  ? "Access your campus management tools and stay informed about campus activities."
+                  : "Stay on top of your attendance, fees, academic progress, and campus updates — all from one place."}
               </p>
               <div className="mt-6 flex flex-wrap gap-3 text-sm">
                 <span className="rounded-full bg-white/15 px-4 py-2">
-                  {user.department || "Department not set"}
+                  {profile.department || "Department not set"}
                 </span>
                 <span className="rounded-full bg-white/15 px-4 py-2">
                   {academicYear}
                 </span>
-                {user.rollNumber && (
+                {profile.rollNumber && (
                   <span className="rounded-full bg-white/15 px-4 py-2">
-                    Roll No: {user.rollNumber}
+                    Roll No: {profile.rollNumber}
                   </span>
                 )}
               </div>
@@ -194,34 +298,36 @@ export default function DashboardPage({
             <section>
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-xl font-bold text-slate-900">
-                  Academic overview
+                  {isAdmin ? "Campus overview" : "Academic overview"}
                 </h2>
-                <span className="text-xs text-slate-500">Student summary</span>
+                <span className="text-xs text-slate-500">
+                  {isAdmin ? "Administrator summary" : "Student summary"}
+                </span>
               </div>
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <StatCard
                   icon="📅"
                   label="Attendance"
                   value="--"
-                  detail="Waiting for attendance data"
+                  detail="Attendance data not connected yet"
                 />
                 <StatCard
                   icon="💳"
                   label="Semester fees"
                   value="--"
-                  detail="View your fee breakdown"
+                  detail="Fee data not connected yet"
                 />
                 <StatCard
                   icon="🎓"
                   label="Scholarships"
                   value="--"
-                  detail="Check eligibility and status"
+                  detail="Scholarship data not connected yet"
                 />
                 <StatCard
                   icon="📝"
                   label="Academic results"
                   value="--"
-                  detail="Your marks will appear here"
+                  detail="Results data not connected yet"
                 />
               </div>
             </section>
@@ -278,30 +384,42 @@ export default function DashboardPage({
                 </p>
               </Section>
 
-              <Section title="Your student profile">
+              <Section title="Your profile">
                 <div className="space-y-4">
                   <div>
                     <p className="text-xs text-slate-500">Full name</p>
                     <p className="mt-1 text-sm font-semibold">
-                      {user.name || "Not provided"}
+                      {profile.name || "Not provided"}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-slate-500">Email address</p>
                     <p className="mt-1 break-all text-sm font-semibold">
-                      {user.email || "Not provided"}
+                      {profile.email || "Not provided"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">Role</p>
+                    <p className="mt-1 text-sm font-semibold capitalize">
+                      {profile.role || "Not provided"}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-slate-500">College</p>
                     <p className="mt-1 text-sm font-semibold">
-                      {user.college || "Not provided"}
+                      {profile.college || "Not provided"}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-slate-500">Department</p>
                     <p className="mt-1 text-sm font-semibold">
-                      {user.department || "Not provided"}
+                      {profile.department || "Not provided"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">Academic year</p>
+                    <p className="mt-1 text-sm font-semibold">
+                      {profile.academicYear || "Not provided"}
                     </p>
                   </div>
                 </div>
