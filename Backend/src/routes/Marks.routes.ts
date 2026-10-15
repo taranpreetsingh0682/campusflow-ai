@@ -1,6 +1,5 @@
 
 import { Router } from "express";
-
 import {
   createMarks,
   getAllMarks,
@@ -9,26 +8,50 @@ import {
   updateMarks,
   deleteMarks,
 } from "../controllers/Marks.controller";
+import { protect } from "../middleware/auth.middleware";
+import { authorize } from "../middleware/role.middleware";
 
 const router = Router();
 
-// Create marks
-router.post("/", createMarks);
+// Require authentication for every marks route
+router.use(protect);
 
-// Get all marks
-router.get("/", getAllMarks);
+// Read marks records
+router.get(
+  "/",
+  authorize("admin", "hod"),
+  getAllMarks
+);
 
-// Get marks for a specific student
-// Keep this route before /:id
-router.get("/student/:studentId", getStudentMarks);
+router.get(
+  "/student/:studentId",
+  authorize("admin", "hod"),
+  getStudentMarks
+);
 
-// Get marks by ID
-router.get("/:id", getMarksById);
+router.get(
+  "/:id",
+  authorize("admin", "hod"),
+  getMarksById
+);
 
-// Update marks
-router.put("/:id", updateMarks);
+// Create, update, and delete marks
+router.post(
+  "/",
+  authorize("admin", "hod"),
+  createMarks
+);
 
-// Delete marks
-router.delete("/:id", deleteMarks);
+router.put(
+  "/:id",
+  authorize("admin", "hod"),
+  updateMarks
+);
+
+router.delete(
+  "/:id",
+  authorize("admin", "hod"),
+  deleteMarks
+);
 
 export default router;

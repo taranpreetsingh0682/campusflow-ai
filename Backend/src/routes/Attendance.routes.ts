@@ -1,5 +1,5 @@
-import { Router } from "express";
 
+import { Router } from "express";
 import {
   createAttendance,
   getAllAttendance,
@@ -8,22 +8,50 @@ import {
   updateAttendance,
   deleteAttendance,
 } from "../controllers/Attendance.controller";
+import { protect } from "../middleware/auth.middleware";
+import { authorize } from "../middleware/role.middleware";
 
 const router = Router();
 
-router.post("/", createAttendance);
+// Require authentication for every attendance route
+router.use(protect);
 
-router.get("/", getAllAttendance);
+// Read attendance records
+router.get(
+  "/",
+  authorize("admin", "hod"),
+  getAllAttendance
+);
 
 router.get(
   "/student/:studentId",
+  authorize("admin", "hod"),
   getStudentAttendance
 );
 
-router.get("/:id", getAttendanceById);
+router.get(
+  "/:id",
+  authorize("admin", "hod"),
+  getAttendanceById
+);
 
-router.put("/:id", updateAttendance);
+// Create, update, and delete attendance
+router.post(
+  "/",
+  authorize("admin", "hod"),
+  createAttendance
+);
 
-router.delete("/:id", deleteAttendance);
+router.put(
+  "/:id",
+  authorize("admin", "hod"),
+  updateAttendance
+);
+
+router.delete(
+  "/:id",
+  authorize("admin", "hod"),
+  deleteAttendance
+);
 
 export default router;
