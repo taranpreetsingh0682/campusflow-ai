@@ -13,15 +13,11 @@ import { authorize } from "../middleware/role.middleware";
 
 const router = Router();
 
-// Require authentication for every attendance route
+// All attendance routes require authentication.
 router.use(protect);
 
-// Read attendance records
-router.get(
-  "/",
-  authorize("admin", "hod"),
-  getAllAttendance
-);
+// Admin/HOD attendance management.
+router.get("/", authorize("admin", "hod"), getAllAttendance);
 
 router.get(
   "/student/:studentId",
@@ -29,29 +25,12 @@ router.get(
   getStudentAttendance
 );
 
-router.get(
-  "/:id",
-  authorize("admin", "hod"),
-  getAttendanceById
-);
+router.get("/:id", authorize("admin", "hod"), getAttendanceById);
 
-// Create, update, and delete attendance
-router.post(
-  "/",
-  authorize("admin", "hod"),
-  createAttendance
-);
+router.post("/", authorize("admin", "hod", "faculty"), createAttendance);
 
-router.put(
-  "/:id",
-  authorize("admin", "hod"),
-  updateAttendance
-);
+router.put("/:id", authorize("admin", "hod"), updateAttendance);
 
-router.delete(
-  "/:id",
-  authorize("admin", "hod"),
-  deleteAttendance
-);
+router.delete("/:id", authorize("admin", "hod"), deleteAttendance);
 
 export default router;
