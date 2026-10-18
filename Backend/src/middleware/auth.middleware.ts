@@ -16,12 +16,15 @@ export const protect = (
       });
     }
 
-    const token = authHeader.split(" ")[1];
+const token = authHeader.split(" ")[1];
 
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET as string
-    );
+console.log("JWT secret loaded:", Boolean(process.env.JWT_SECRET));
+console.log("JWT token parts:", token?.split(".").length);
+
+const decoded = jwt.verify(
+  token,
+  process.env.JWT_SECRET as string
+);
 
     (req as any).user = decoded;
 
