@@ -6,6 +6,7 @@ import Attendance from "../models/Attendance";
 import Enrollment from "../models/Enrollment";
 import Faculty from "../models/Faculty";
 import Subject from "../models/Subject";
+import Student from "../models/Student";
 
 // Validate MongoDB ObjectId
 const isValidId = (id: unknown): id is string =>
@@ -304,13 +305,14 @@ export const getAttendanceById = async (
   }
 };
 
-// GET STUDENT ATTENDANCE REPORT — currently protected by admin/HOD route
+// GET STUDENT ATTENDANCE REPORT
 export const getStudentAttendance = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
     const { studentId } = req.params;
+    const loggedInUser = (req as any).user;
 
     if (!isValidId(studentId)) {
       res.status(400).json({
@@ -318,6 +320,29 @@ export const getStudentAttendance = async (
         message: "Invalid student ID",
       });
       return;
+    }
+
+    // Students can access only their own attendance.
+    if (loggedInUser.role === "student") {
+      const studentProfile = await Student.findOne({
+        user: loggedInUser.id,
+      });
+
+      if (!studentProfile) {
+        res.status(404).json({
+          success: false,
+          message: "Student profile is not linked to this account",
+        });
+        return;
+      }
+
+      if (studentProfile._id.toString() !== studentId) {
+        res.status(403).json({
+          success: false,
+          message: "You can only view your own attendance",
+        });
+        return;
+      }
     }
 
     const attendance = await Attendance.find({
@@ -328,9 +353,11 @@ export const getStudentAttendance = async (
       .sort({ date: -1 });
 
     const totalClasses = attendance.length;
+
     const presentClasses = attendance.filter(
       (record) => record.status === "present"
     ).length;
+
     const absentClasses = attendance.filter(
       (record) => record.status === "absent"
     ).length;

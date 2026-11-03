@@ -21,7 +21,7 @@ router.get("/", authorize("admin", "hod"), getAllAttendance);
 
 router.get(
   "/student/:studentId",
-  authorize("admin", "hod"),
+  authorize("admin", "hod","student"),
   getStudentAttendance
 );
 
