@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
@@ -364,15 +363,29 @@ export default function DashboardPage({
     };
   }, [profile, user]);
 
-  const firstName = profile.name?.trim().split(/\s+/)[0] || "Student";
+ const displayName =
+  [
+    profile.name,
+    user.name,
+    profile.email?.split("@")[0],
+    user.email?.split("@")[0],
+  ].find((value) => {
+    const name = value?.trim().toLowerCase();
+    return (
+      !!name &&
+      !["user", "student", "unknown", "undefined", "null"].includes(name)
+    );
+  })?.trim() || "Student";
 
-  const initials = (profile.name || "Student")
-    .trim()
-    .split(/\s+/)
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+const firstName = displayName.split(/\s+/)[0];
+
+const initials = displayName
+  .trim()
+  .split(/\s+/)
+  .map((part) => part[0])
+  .slice(0, 2)
+  .join("")
+  .toUpperCase();
 
   const academicYear = profile.academicYear
     ? `Year ${profile.academicYear}`
