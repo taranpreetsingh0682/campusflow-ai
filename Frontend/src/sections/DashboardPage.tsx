@@ -68,10 +68,12 @@ type AttendanceResponse = {
   success: boolean;
   message?: string;
   count?: number;
-  totalClasses?: number;
-  presentClasses?: number;
-  absentClasses?: number;
-  attendancePercentage?: number;
+  summary?: {
+    totalClasses?: number;
+    presentClasses?: number;
+    absentClasses?: number;
+    attendancePercentage?: number;
+  };
   data?: AttendanceRecord[];
 };
 
@@ -338,10 +340,10 @@ export default function DashboardPage({
 
         if (!cancelled) {
           setAttendance(Array.isArray(result.data) ? result.data : []);
-          setTotalClasses(result.totalClasses ?? 0);
-          setPresentClasses(result.presentClasses ?? 0);
-          setAbsentClasses(result.absentClasses ?? 0);
-          setAttendancePercentage(result.attendancePercentage ?? 0);
+          setTotalClasses(result.summary?.totalClasses ?? 0);
+          setPresentClasses(result.summary?.presentClasses ?? 0);
+          setAbsentClasses(result.summary?.absentClasses ?? 0);
+          setAttendancePercentage(result.summary?.attendancePercentage ?? 0);
         }
       } catch (error) {
         if (!cancelled) {
@@ -363,29 +365,31 @@ export default function DashboardPage({
     };
   }, [profile, user]);
 
- const displayName =
-  [
-    profile.name,
-    user.name,
-    profile.email?.split("@")[0],
-    user.email?.split("@")[0],
-  ].find((value) => {
-    const name = value?.trim().toLowerCase();
-    return (
-      !!name &&
-      !["user", "student", "unknown", "undefined", "null"].includes(name)
-    );
-  })?.trim() || "Student";
+  // Ignore generic placeholder names such as "User" and "Student".
+  // Prefer a real profile/login name, then use the email username as a fallback.
+  const displayName =
+    [
+      profile.name,
+      user.name,
+      profile.email?.split("@")[0],
+      user.email?.split("@")[0],
+    ].find((value) => {
+      const name = value?.trim().toLowerCase();
+      return (
+        !!name &&
+        !["user", "student", "unknown", "undefined", "null"].includes(name)
+      );
+    })?.trim() || "Student";
 
-const firstName = displayName.split(/\s+/)[0];
+  const firstName = displayName.split(/\s+/)[0];
 
-const initials = displayName
-  .trim()
-  .split(/\s+/)
-  .map((part) => part[0])
-  .slice(0, 2)
-  .join("")
-  .toUpperCase();
+  const initials = displayName
+    .trim()
+    .split(/\s+/)
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 
   const academicYear = profile.academicYear
     ? `Year ${profile.academicYear}`
@@ -490,7 +494,7 @@ const initials = displayName
 
             <div className="flex items-center gap-3">
               <div className="hidden text-right sm:block">
-                <p className="text-sm font-semibold">{profile.name || "User"}</p>
+                <p className="text-sm font-semibold">{displayName}</p>
                 <p className="text-xs capitalize text-slate-500">
                   {profile.role || "student"}
                 </p>
@@ -537,7 +541,7 @@ const initials = displayName
                 {isAdmin ? "YOUR ADMIN DASHBOARD" : "YOUR STUDENT DASHBOARD"}
               </p>
               <h1 className="mt-3 text-3xl font-bold sm:text-4xl">
-                Welcome , {firstName}! 👋
+                Welcome back, {firstName}! 👋
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-indigo-100 sm:text-base">
                 {isAdmin
@@ -976,7 +980,7 @@ const initials = displayName
                   <div>
                     <p className="text-xs text-slate-500">Full name</p>
                     <p className="mt-1 text-sm font-semibold">
-                      {profile.name || "Not provided"}
+                      {displayName}
                     </p>
                   </div>
                   <div>
