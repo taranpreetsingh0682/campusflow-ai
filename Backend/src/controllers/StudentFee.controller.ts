@@ -1,7 +1,9 @@
 
 import { Request, Response } from "express";
+import mongoose from "mongoose";
 import StudentFee from "../models/StudentFee";
 import Student from "../models/Student";
+import FeeStructure from "../models/FeeStructure";
 
 // CREATE STUDENT FEE
 export const createStudentFee = async (
@@ -12,41 +14,102 @@ export const createStudentFee = async (
     const {
       student,
       feeStructure,
-      scholarship,
       academicYear,
-      totalFee,
       scholarshipAmount = 0,
       fine = 0,
       paidAmount = 0,
     } = req.body;
 
+    if (!student || !feeStructure || !academicYear) {
+      res.status(400).json({
+        success: false,
+        message: "Student, fee structure and academic year are required",
+      });
+      return;
+    }
+
     if (
-      !student ||
-      !feeStructure ||
-      !academicYear ||
-      totalFee === undefined
+      !mongoose.Types.ObjectId.isValid(student) ||
+      !mongoose.Types.ObjectId.isValid(feeStructure)
+    ) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid student or fee structure ID",
+      });
+      return;
+    }
+
+    if (
+      ![scholarshipAmount, fine, paidAmount].every(
+        (amount) =>
+          typeof amount === "number" &&
+          Number.isFinite(amount) &&
+          amount >= 0
+      )
+    ) {
+      res.status(400).json({
+        success: false,
+        message: "Fee amounts must be valid non-negative numbers",
+      });
+      return;
+    }
+
+    // Find actual student
+    const studentRecord = await Student.findById(student);
+
+    if (!studentRecord) {
+      res.status(404).json({
+        success: false,
+        message: "Student not found",
+      });
+      return;
+    }
+
+    // Find actual fee structure
+    const structure = await FeeStructure.findById(feeStructure);
+
+    if (!structure) {
+      res.status(404).json({
+        success: false,
+        message: "Fee structure not found",
+      });
+      return;
+    }
+
+    // Verify department and semester
+    if (
+      studentRecord.department.toString() !==
+        structure.department.toString() ||
+      studentRecord.semester !== structure.semester
     ) {
       res.status(400).json({
         success: false,
         message:
-          "Student, fee structure, academic year and total fee are required",
+          "Fee structure does not match student's department and semester",
       });
       return;
     }
 
-    if (
-      totalFee < 0 ||
-      scholarshipAmount < 0 ||
-      fine < 0 ||
-      paidAmount < 0
-    ) {
+    // Verify academic year
+    if (academicYear !== structure.academicYear) {
       res.status(400).json({
         success: false,
-        message: "Fee amounts cannot be negative",
+        message: "Academic year does not match fee structure",
       });
       return;
     }
 
+    // Do not allow unverified scholarship discounts
+    if (scholarshipAmount !== 0) {
+      res.status(400).json({
+        success: false,
+        message:
+          "Scholarship discount cannot be added without an approved scholarship",
+      });
+      return;
+    }
+
+    // Check existing fee
     const existingStudentFee = await StudentFee.findOne({
       student,
       feeStructure,
@@ -61,6 +124,9 @@ export const createStudentFee = async (
       });
       return;
     }
+
+    // Always use the actual fee from database
+    const totalFee = structure.totalFee;
 
     const payableAmount = Math.max(
       0,
@@ -79,7 +145,7 @@ export const createStudentFee = async (
 
     let status: "pending" | "partial" | "paid" = "pending";
 
-    if (paidAmount === payableAmount) {
+    if (pendingAmount === 0) {
       status = "paid";
     } else if (paidAmount > 0) {
       status = "partial";
@@ -90,10 +156,9 @@ export const createStudentFee = async (
     const studentFee = await StudentFee.create({
       student,
       feeStructure,
-      scholarship,
       academicYear,
       totalFee,
-      scholarshipAmount,
+      scholarshipAmount: 0,
       fine,
       payableAmount,
       paidAmount,
@@ -163,7 +228,6 @@ export const getAllStudentFees = async (
 };
 
 // GET MY STUDENT FEES
-// Requires authentication through the protect middleware on the route.
 export const getMyStudentFees = async (
   req: Request,
   res: Response
@@ -220,7 +284,16 @@ export const getStudentFeeById = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { id } = req.params;
+    const idParam = req.params.id;
+    const id = Array.isArray(idParam) ? idParam[0] : idParam;
+
+    if (typeof id !== "string" || !mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid student fee ID",
+      });
+      return;
+    }
 
     const studentFee = await StudentFee.findById(id)
       .populate("student")
@@ -256,7 +329,15 @@ export const updateStudentFee = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid student fee ID",
+      });
+      return;
+    }
 
     const existingFee = await StudentFee.findById(id);
 
@@ -268,10 +349,7 @@ export const updateStudentFee = async (
       return;
     }
 
-    const totalFee =
-      req.body.totalFee !== undefined
-        ? req.body.totalFee
-        : existingFee.totalFee;
+    const totalFee = existingFee.totalFee;
 
     const scholarshipAmount =
       req.body.scholarshipAmount !== undefined
@@ -289,14 +367,27 @@ export const updateStudentFee = async (
         : existingFee.paidAmount;
 
     if (
-      totalFee < 0 ||
-      scholarshipAmount < 0 ||
-      fine < 0 ||
-      paidAmount < 0
+      ![scholarshipAmount, fine, paidAmount].every(
+        (amount) =>
+          typeof amount === "number" &&
+          Number.isFinite(amount) &&
+          amount >= 0
+      )
     ) {
       res.status(400).json({
         success: false,
-        message: "Fee amounts cannot be negative",
+        message: "Fee amounts must be valid non-negative numbers",
+      });
+      return;
+    }
+
+    if (
+      scholarshipAmount > 0 &&
+      !existingFee.scholarship
+    ) {
+      res.status(400).json({
+        success: false,
+        message: "An approved scholarship is required for a discount",
       });
       return;
     }
@@ -318,7 +409,7 @@ export const updateStudentFee = async (
 
     let status: "pending" | "partial" | "paid" = "pending";
 
-    if (paidAmount === payableAmount) {
+    if (pendingAmount === 0) {
       status = "paid";
     } else if (paidAmount > 0) {
       status = "partial";
@@ -329,8 +420,6 @@ export const updateStudentFee = async (
     const studentFee = await StudentFee.findByIdAndUpdate(
       id,
       {
-        ...req.body,
-        totalFee,
         scholarshipAmount,
         fine,
         payableAmount,
@@ -370,7 +459,15 @@ export const deleteStudentFee = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = req.params.id;
+
+    if (typeof id !== "string" || !mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid student fee ID",
+      });
+      return;
+    }
 
     const studentFee = await StudentFee.findByIdAndDelete(id);
 

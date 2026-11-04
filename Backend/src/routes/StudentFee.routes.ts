@@ -1,4 +1,3 @@
-
 import { Router } from "express";
 
 import {
@@ -11,14 +10,18 @@ import {
 } from "../controllers/StudentFee.controller";
 
 import { protect } from "../middleware/auth.middleware";
+import { authorize } from "../middleware/role.middleware";
 
 const router = Router();
 
-// Create a student fee record
-router.post("/", createStudentFee);
+// All fee routes require authentication
+router.use(protect);
 
-// Get all student fee records
-router.get("/", getAllStudentFees);
+// Admin and Accounts can create fee records
+router.post("/", authorize("admin", "accounts"), createStudentFee);
+
+// Only Admin and Accounts can view all students' fee records
+router.get("/", authorize("admin", "accounts"), getAllStudentFees);
 
 // Test route
 router.get("/test", (_req, res) => {
@@ -28,16 +31,16 @@ router.get("/test", (_req, res) => {
   });
 });
 
-// Get fees for the currently authenticated student
-router.get("/my-fees", protect, getMyStudentFees);
+// Students can view only their own fees
+router.get("/my-fees", authorize("student"), getMyStudentFees);
 
-// Get a fee record by ID
-router.get("/:id", getStudentFeeById);
+// Admin and Accounts can view a specific fee record
+router.get("/:id", authorize("admin", "accounts"), getStudentFeeById);
 
-// Update a fee record
-router.put("/:id", updateStudentFee);
+// Admin and Accounts can update fee records
+router.put("/:id", authorize("admin", "accounts"), updateStudentFee);
 
-// Delete a fee record
-router.delete("/:id", deleteStudentFee);
+// Admin and Accounts can delete fee records
+router.delete("/:id", authorize("admin", "accounts"), deleteStudentFee);
 
 export default router;
