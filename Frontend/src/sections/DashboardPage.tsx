@@ -541,7 +541,7 @@ export default function DashboardPage({
                 {isAdmin ? "YOUR ADMIN DASHBOARD" : "YOUR STUDENT DASHBOARD"}
               </p>
               <h1 className="mt-3 text-3xl font-bold sm:text-4xl">
-                Welcome back, {firstName}! 👋
+                Welcome, {firstName}! 👋
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-indigo-100 sm:text-base">
                 {isAdmin
