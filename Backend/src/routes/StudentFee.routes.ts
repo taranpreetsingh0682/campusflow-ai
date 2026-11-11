@@ -1,3 +1,4 @@
+
 import { Router } from "express";
 
 import {
@@ -14,16 +15,24 @@ import { authorize } from "../middleware/role.middleware";
 
 const router = Router();
 
-// All fee routes require authentication
+// All fee routes require authentication.
 router.use(protect);
 
-// Admin and Accounts can create fee records
-router.post("/", authorize("admin", "accounts"), createStudentFee);
+// Admin, Developer and Accounts can create fee records.
+router.post(
+  "/",
+  authorize("admin", "developer", "accounts"),
+  createStudentFee
+);
 
-// Only Admin and Accounts can view all students' fee records
-router.get("/", authorize("admin", "accounts"), getAllStudentFees);
+// Admin, Developer and Accounts can view all fee records.
+router.get(
+  "/",
+  authorize("admin", "developer", "accounts"),
+  getAllStudentFees
+);
 
-// Test route
+// Test route.
 router.get("/test", (_req, res) => {
   res.json({
     success: true,
@@ -31,16 +40,32 @@ router.get("/test", (_req, res) => {
   });
 });
 
-// Students can view only their own fees
-router.get("/my-fees", authorize("student"), getMyStudentFees);
+// Students can view only their own fees.
+router.get(
+  "/my-fees",
+  authorize("student"),
+  getMyStudentFees
+);
 
-// Admin and Accounts can view a specific fee record
-router.get("/:id", authorize("admin", "accounts"), getStudentFeeById);
+// Admin, Developer and Accounts can view a specific fee record.
+router.get(
+  "/:id",
+  authorize("admin", "developer", "accounts"),
+  getStudentFeeById
+);
 
-// Admin and Accounts can update fee records
-router.put("/:id", authorize("admin", "accounts"), updateStudentFee);
+// Admin, Developer and Accounts can update fee records.
+router.put(
+  "/:id",
+  authorize("admin", "developer", "accounts"),
+  updateStudentFee
+);
 
-// Admin and Accounts can delete fee records
-router.delete("/:id", authorize("admin", "accounts"), deleteStudentFee);
+// Admin, Developer and Accounts can delete fee records.
+router.delete(
+  "/:id",
+  authorize("admin", "developer", "accounts"),
+  deleteStudentFee
+);
 
 export default router;

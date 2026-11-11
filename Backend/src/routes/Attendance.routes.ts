@@ -1,5 +1,6 @@
 
 import { Router } from "express";
+
 import {
   createAttendance,
   getAllAttendance,
@@ -8,6 +9,7 @@ import {
   updateAttendance,
   deleteAttendance,
 } from "../controllers/Attendance.controller";
+
 import { protect } from "../middleware/auth.middleware";
 import { authorize } from "../middleware/role.middleware";
 
@@ -16,21 +18,46 @@ const router = Router();
 // All attendance routes require authentication.
 router.use(protect);
 
-// Admin/HOD attendance management.
-router.get("/", authorize("admin", "hod"), getAllAttendance);
+// View all attendance.
+router.get(
+  "/",
+  authorize("admin", "developer", "hod"),
+  getAllAttendance
+);
 
+// View student attendance.
 router.get(
   "/student/:studentId",
-  authorize("admin", "hod","student"),
+  authorize("admin", "developer", "hod", "student"),
   getStudentAttendance
 );
 
-router.get("/:id", authorize("admin", "hod"), getAttendanceById);
+// View attendance by ID.
+router.get(
+  "/:id",
+  authorize("admin", "developer", "hod"),
+  getAttendanceById
+);
 
-router.post("/", authorize("admin", "hod", "faculty"), createAttendance);
+// Create attendance.
+router.post(
+  "/",
+  authorize("admin", "developer", "hod", "faculty"),
+  createAttendance
+);
 
-router.put("/:id", authorize("admin", "hod"), updateAttendance);
+// Update attendance.
+router.put(
+  "/:id",
+  authorize("admin", "developer", "hod"),
+  updateAttendance
+);
 
-router.delete("/:id", authorize("admin", "hod"), deleteAttendance);
+// Delete attendance.
+router.delete(
+  "/:id",
+  authorize("admin", "developer", "hod"),
+  deleteAttendance
+);
 
 export default router;
