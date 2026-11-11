@@ -940,11 +940,15 @@ export default function DashboardPage({
                   <button
                     type="button"
                     key={item.title}
-                    onClick={() =>
-                      window.alert(
-                        `${item.title} will be connected to the backend next.`
-                      )
-                    }
+                    onClick={() => {
+  if (item.title === "Attendance") {
+    onAttendanceClick();
+  } else {
+    window.alert(
+      `${item.title} will be connected to the backend next.`
+    );
+  }
+}}
                     className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-indigo-300 hover:shadow-md"
                   >
                     <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-2xl transition group-hover:bg-indigo-100">
