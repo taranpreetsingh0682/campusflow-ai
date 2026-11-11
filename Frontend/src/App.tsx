@@ -3,6 +3,7 @@ import { useState } from "react";
 import LoginPage from "./sections/LoginPage";
 import RegisterPage from "./sections/RegisterPage";
 import DashboardPage from "./sections/DashboardPage";
+import AttendancePage from "./sections/AttendancePage";
 
 type AppUser = {
   id: string;
@@ -13,16 +14,20 @@ type AppUser = {
   department?: string;
   academicYear?: number | string;
   rollNumber?: string;
+  studentId?: string;
+  student?: {
+    _id?: string;
+    id?: string;
+  };
 };
 
-type Page = "login" | "register" | "dashboard";
+type Page = "login" | "register" | "dashboard" | "attendance";
 
 function getSavedUser(): AppUser | null {
   try {
     const token = localStorage.getItem("token");
     const savedUser = localStorage.getItem("user");
 
-    // A user and token must both exist to restore the dashboard.
     if (!token || !savedUser) {
       return null;
     }
@@ -57,11 +62,22 @@ export default function App() {
     setCurrentPage("login");
   }
 
-  if (currentPage === "dashboard" && currentUser) {
+  if (currentUser && currentPage === "attendance") {
+    return (
+      <AttendancePage
+        user={currentUser}
+        onBack={() => setCurrentPage("dashboard")}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  if (currentUser && currentPage === "dashboard") {
     return (
       <DashboardPage
         user={currentUser}
         onLogout={handleLogout}
+        onAttendanceClick={() => setCurrentPage("attendance")}
       />
     );
   }

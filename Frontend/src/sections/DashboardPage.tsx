@@ -80,6 +80,7 @@ type AttendanceResponse = {
 type DashboardPageProps = {
   user: Student;
   onLogout: () => void;
+  onAttendanceClick: () => void;
 };
 
 type ProfileResponse = {
@@ -163,6 +164,7 @@ function Section({
 export default function DashboardPage({
   user,
   onLogout,
+  onAttendanceClick,
 }: DashboardPageProps) {
   const [profile, setProfile] = useState<Student>(user);
   const [profileLoading, setProfileLoading] = useState(true);
@@ -446,29 +448,35 @@ export default function DashboardPage({
             {isAdmin ? "Admin menu" : "Student menu"}
           </p>
 
-          <nav className="space-y-2">
-            {[
-              ["🏠", "Dashboard"],
-              ["📅", "Attendance"],
-              ["💳", "Fees & Payments"],
-              ["🎓", "Scholarships"],
-              ["📝", "Results"],
-              ["💬", "Complaints"],
-              ["🔔", "Notifications"],
-            ].map(([icon, label], index) => (
-              <div
-                key={label}
-                className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm ${
-                  index === 0
-                    ? "bg-indigo-600 font-semibold text-white"
-                    : "text-slate-300"
-                }`}
-              >
-                <span>{icon}</span>
-                {label}
-              </div>
-            ))}
-          </nav>
+         <nav className="space-y-2">
+  {[
+    ["🏠", "Dashboard"],
+    ["📅", "Attendance"],
+    ["💳", "Fees & Payments"],
+    ["🎓", "Scholarships"],
+    ["📝", "Results"],
+    ["💬", "Complaints"],
+    ["🔔", "Notifications"],
+  ].map(([icon, label]) => (
+    <button
+      type="button"
+      key={label}
+      onClick={() => {
+        if (label === "Attendance") {
+          onAttendanceClick();
+        }
+      }}
+      className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${
+        label === "Dashboard"
+          ? "bg-indigo-600 font-semibold text-white"
+          : "text-slate-300 hover:bg-slate-800 hover:text-white"
+      }`}
+    >
+      <span>{icon}</span>
+      {label}
+    </button>
+  ))}
+</nav>
 
           <div className="mt-auto rounded-2xl border border-slate-800 bg-slate-900 p-4">
             <p className="text-sm font-semibold">Need help?</p>
