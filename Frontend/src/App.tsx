@@ -4,6 +4,7 @@ import LoginPage from "./sections/LoginPage";
 import RegisterPage from "./sections/RegisterPage";
 import DashboardPage from "./sections/DashboardPage";
 import AttendancePage from "./sections/AttendancePage";
+import StudentModulePage from "./sections/StudentModulePage";
 
 type AppUser = {
   id: string;
@@ -21,16 +22,26 @@ type AppUser = {
   };
 };
 
-type Page = "login" | "register" | "dashboard" | "attendance";
+type ModulePage =
+  | "fees"
+  | "scholarships"
+  | "results"
+  | "complaints"
+  | "notifications";
+
+type Page =
+  | "login"
+  | "register"
+  | "dashboard"
+  | "attendance"
+  | ModulePage;
 
 function getSavedUser(): AppUser | null {
   try {
     const token = localStorage.getItem("token");
     const savedUser = localStorage.getItem("user");
 
-    if (!token || !savedUser) {
-      return null;
-    }
+    if (!token || !savedUser) return null;
 
     return JSON.parse(savedUser) as AppUser;
   } catch {
@@ -57,7 +68,6 @@ export default function App() {
   function handleLogout() {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
-
     setCurrentUser(null);
     setCurrentPage("login");
   }
@@ -72,22 +82,42 @@ export default function App() {
     );
   }
 
+  const modulePages: ModulePage[] = [
+    "fees",
+    "scholarships",
+    "results",
+    "complaints",
+    "notifications",
+  ];
+
+  if (currentUser && modulePages.includes(currentPage as ModulePage)) {
+    return (
+      <StudentModulePage
+        page={currentPage as ModulePage}
+        user={currentUser}
+        onBack={() => setCurrentPage("dashboard")}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
   if (currentUser && currentPage === "dashboard") {
     return (
       <DashboardPage
         user={currentUser}
         onLogout={handleLogout}
         onAttendanceClick={() => setCurrentPage("attendance")}
+        onFeesClick={() => setCurrentPage("fees")}
+        onScholarshipsClick={() => setCurrentPage("scholarships")}
+        onResultsClick={() => setCurrentPage("results")}
+        onComplaintsClick={() => setCurrentPage("complaints")}
+        onNotificationsClick={() => setCurrentPage("notifications")}
       />
     );
   }
 
   if (currentPage === "register") {
-    return (
-      <RegisterPage
-        onLoginClick={() => setCurrentPage("login")}
-      />
-    );
+    return <RegisterPage onLoginClick={() => setCurrentPage("login")} />;
   }
 
   return (

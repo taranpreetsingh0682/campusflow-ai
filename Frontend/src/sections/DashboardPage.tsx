@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
@@ -81,6 +82,11 @@ type DashboardPageProps = {
   user: Student;
   onLogout: () => void;
   onAttendanceClick: () => void;
+  onFeesClick: () => void;
+  onScholarshipsClick: () => void;
+  onResultsClick: () => void;
+  onComplaintsClick: () => void;
+  onNotificationsClick: () => void;
 };
 
 type ProfileResponse = {
@@ -165,6 +171,11 @@ export default function DashboardPage({
   user,
   onLogout,
   onAttendanceClick,
+  onFeesClick,
+  onScholarshipsClick,
+  onResultsClick,
+  onComplaintsClick,
+  onNotificationsClick,
 }: DashboardPageProps) {
   const [profile, setProfile] = useState<Student>(user);
   const [profileLoading, setProfileLoading] = useState(true);
@@ -345,7 +356,9 @@ export default function DashboardPage({
           setTotalClasses(result.summary?.totalClasses ?? 0);
           setPresentClasses(result.summary?.presentClasses ?? 0);
           setAbsentClasses(result.summary?.absentClasses ?? 0);
-          setAttendancePercentage(result.summary?.attendancePercentage ?? 0);
+          setAttendancePercentage(
+            result.summary?.attendancePercentage ?? 0
+          );
         }
       } catch (error) {
         if (!cancelled) {
@@ -367,8 +380,6 @@ export default function DashboardPage({
     };
   }, [profile, user]);
 
-  // Ignore generic placeholder names such as "User" and "Student".
-  // Prefer a real profile/login name, then use the email username as a fallback.
   const displayName =
     [
       profile.name,
@@ -404,18 +415,22 @@ export default function DashboardPage({
     (sum, fee) => sum + (fee.payableAmount ?? 0),
     0
   );
+
   const totalPaid = fees.reduce(
     (sum, fee) => sum + (fee.paidAmount ?? 0),
     0
   );
+
   const totalPending = fees.reduce(
     (sum, fee) => sum + (fee.pendingAmount ?? 0),
     0
   );
+
   const totalScholarship = fees.reduce(
     (sum, fee) => sum + (fee.scholarshipAmount ?? 0),
     0
   );
+
   const totalFines = fees.reduce(
     (sum, fee) => sum + (fee.fine ?? 0),
     0
@@ -427,8 +442,30 @@ export default function DashboardPage({
     { icon: "🎓", title: "Scholarships", description: "Explore assistance" },
     { icon: "📝", title: "Results", description: "View academic results" },
     { icon: "💬", title: "Complaints", description: "Get campus support" },
+    { icon: "🔔", title: "Notifications", description: "Campus updates" },
     { icon: "📄", title: "No-Dues", description: "Check clearance status" },
   ];
+
+  function handleQuickLinkClick(title: string) {
+    if (title === "Attendance") onAttendanceClick();
+    else if (title === "Semester Fees") onFeesClick();
+    else if (title === "Scholarships") onScholarshipsClick();
+    else if (title === "Results") onResultsClick();
+    else if (title === "Complaints") onComplaintsClick();
+    else if (title === "Notifications") onNotificationsClick();
+    else {
+      window.alert("No-Dues page will be connected soon.");
+    }
+  }
+
+  function handleSidebarClick(label: string) {
+    if (label === "Attendance") onAttendanceClick();
+    else if (label === "Fees & Payments") onFeesClick();
+    else if (label === "Scholarships") onScholarshipsClick();
+    else if (label === "Results") onResultsClick();
+    else if (label === "Complaints") onComplaintsClick();
+    else if (label === "Notifications") onNotificationsClick();
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
@@ -440,7 +477,9 @@ export default function DashboardPage({
             </div>
             <div>
               <h1 className="text-lg font-bold">CampusFlow AI</h1>
-              <p className="text-xs text-slate-400">Smart Campus Platform</p>
+              <p className="text-xs text-slate-400">
+                Smart Campus Platform
+              </p>
             </div>
           </div>
 
@@ -448,35 +487,31 @@ export default function DashboardPage({
             {isAdmin ? "Admin menu" : "Student menu"}
           </p>
 
-         <nav className="space-y-2">
-  {[
-    ["🏠", "Dashboard"],
-    ["📅", "Attendance"],
-    ["💳", "Fees & Payments"],
-    ["🎓", "Scholarships"],
-    ["📝", "Results"],
-    ["💬", "Complaints"],
-    ["🔔", "Notifications"],
-  ].map(([icon, label]) => (
-    <button
-      type="button"
-      key={label}
-      onClick={() => {
-        if (label === "Attendance") {
-          onAttendanceClick();
-        }
-      }}
-      className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${
-        label === "Dashboard"
-          ? "bg-indigo-600 font-semibold text-white"
-          : "text-slate-300 hover:bg-slate-800 hover:text-white"
-      }`}
-    >
-      <span>{icon}</span>
-      {label}
-    </button>
-  ))}
-</nav>
+          <nav className="space-y-2">
+            {[
+              ["🏠", "Dashboard"],
+              ["📅", "Attendance"],
+              ["💳", "Fees & Payments"],
+              ["🎓", "Scholarships"],
+              ["📝", "Results"],
+              ["💬", "Complaints"],
+              ["🔔", "Notifications"],
+            ].map(([icon, label]) => (
+              <button
+                type="button"
+                key={label}
+                onClick={() => handleSidebarClick(label)}
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${
+                  label === "Dashboard"
+                    ? "bg-indigo-600 font-semibold text-white"
+                    : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                }`}
+              >
+                <span>{icon}</span>
+                {label}
+              </button>
+            ))}
+          </nav>
 
           <div className="mt-auto rounded-2xl border border-slate-800 bg-slate-900 p-4">
             <p className="text-sm font-semibold">Need help?</p>
@@ -485,16 +520,22 @@ export default function DashboardPage({
                 ? "Manage campus information and support requests."
                 : "Raise a complaint to get support from your campus team."}
             </p>
-            <p className="mt-3 text-xs font-semibold text-indigo-300">
-              Campus support
-            </p>
+            <button
+              type="button"
+              onClick={onComplaintsClick}
+              className="mt-3 text-xs font-semibold text-indigo-300 hover:text-indigo-200"
+            >
+              Campus support →
+            </button>
           </div>
         </aside>
 
         <main className="min-w-0 flex-1">
           <header className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4 sm:px-8">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">{portalTitle}</h2>
+              <h2 className="text-lg font-bold text-slate-900">
+                {portalTitle}
+              </h2>
               <p className="text-xs text-slate-500">
                 Your campus, all in one place
               </p>
@@ -532,7 +573,9 @@ export default function DashboardPage({
                 role="alert"
                 className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
               >
-                <p className="font-semibold">Could not refresh your profile</p>
+                <p className="font-semibold">
+                  Could not refresh your profile
+                </p>
                 <p className="mt-1">{profileError}</p>
                 <button
                   type="button"
@@ -623,7 +666,9 @@ export default function DashboardPage({
                 <StatCard
                   icon="💰"
                   label="Amount paid"
-                  value={feesLoading || feesError ? "--" : formatCurrency(totalPaid)}
+                  value={
+                    feesLoading || feesError ? "--" : formatCurrency(totalPaid)
+                  }
                   detail="Payments recorded in your fee records"
                 />
 
@@ -631,7 +676,9 @@ export default function DashboardPage({
                   icon="⏳"
                   label="Amount pending"
                   value={
-                    feesLoading || feesError ? "--" : formatCurrency(totalPending)
+                    feesLoading || feesError
+                      ? "--"
+                      : formatCurrency(totalPending)
                   }
                   detail="Outstanding fee balance"
                 />
@@ -698,7 +745,10 @@ export default function DashboardPage({
                       <div
                         className="h-full rounded-full bg-indigo-600 transition-all"
                         style={{
-                          width: `${Math.min(100, Math.max(0, attendancePercentage))}%`,
+                          width: `${Math.min(
+                            100,
+                            Math.max(0, attendancePercentage)
+                          )}%`,
                         }}
                       />
                     </div>
@@ -724,15 +774,19 @@ export default function DashboardPage({
                               {record.subject?.name || "Class"}
                             </p>
                             <p className="mt-1 text-sm text-slate-500">
-                              {record.subject?.code || "Subject code unavailable"}
+                              {record.subject?.code ||
+                                "Subject code unavailable"}
                             </p>
                             <p className="mt-1 text-xs text-slate-500">
-                              {new Date(record.date).toLocaleDateString("en-IN", {
-                                day: "2-digit",
-                                month: "short",
-                                year: "numeric",
-                                timeZone: "UTC",
-                              })}
+                              {new Date(record.date).toLocaleDateString(
+                                "en-IN",
+                                {
+                                  day: "2-digit",
+                                  month: "short",
+                                  year: "numeric",
+                                  timeZone: "UTC",
+                                }
+                              )}
                             </p>
                           </div>
                           <span
@@ -809,7 +863,9 @@ export default function DashboardPage({
                     <div className="rounded-xl bg-emerald-50 p-4">
                       <p className="text-sm text-emerald-700">No-dues status</p>
                       <p className="mt-2 text-xl font-bold text-emerald-950">
-                        {fees.every((fee) => fee.noDues) ? "Cleared" : "Pending"}
+                        {fees.every((fee) => fee.noDues)
+                          ? "Cleared"
+                          : "Pending"}
                       </p>
                     </div>
                   </div>
@@ -854,7 +910,9 @@ export default function DashboardPage({
 
                         <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                           <div>
-                            <p className="text-xs text-slate-500">Original fee</p>
+                            <p className="text-xs text-slate-500">
+                              Original fee
+                            </p>
                             <p className="mt-1 font-semibold">
                               {formatCurrency(fee.totalFee)}
                             </p>
@@ -874,19 +932,25 @@ export default function DashboardPage({
                             </p>
                           </div>
                           <div>
-                            <p className="text-xs text-slate-500">Total payable</p>
+                            <p className="text-xs text-slate-500">
+                              Total payable
+                            </p>
                             <p className="mt-1 font-semibold">
                               {formatCurrency(fee.payableAmount)}
                             </p>
                           </div>
                           <div>
-                            <p className="text-xs text-slate-500">Amount paid</p>
+                            <p className="text-xs text-slate-500">
+                              Amount paid
+                            </p>
                             <p className="mt-1 font-semibold text-emerald-700">
                               {formatCurrency(fee.paidAmount)}
                             </p>
                           </div>
                           <div>
-                            <p className="text-xs text-slate-500">Amount pending</p>
+                            <p className="text-xs text-slate-500">
+                              Amount pending
+                            </p>
                             <p className="mt-1 font-semibold text-red-700">
                               {formatCurrency(fee.pendingAmount)}
                             </p>
@@ -901,7 +965,8 @@ export default function DashboardPage({
                                 ? Math.min(
                                     100,
                                     Math.round(
-                                      (fee.paidAmount / fee.payableAmount) * 100
+                                      (fee.paidAmount / fee.payableAmount) *
+                                        100
                                     )
                                   )
                                 : 100}
@@ -916,7 +981,8 @@ export default function DashboardPage({
                                   fee.payableAmount > 0
                                     ? Math.min(
                                         100,
-                                        (fee.paidAmount / fee.payableAmount) * 100
+                                        (fee.paidAmount / fee.payableAmount) *
+                                          100
                                       )
                                     : 100
                                 }%`,
@@ -940,15 +1006,7 @@ export default function DashboardPage({
                   <button
                     type="button"
                     key={item.title}
-                    onClick={() => {
-  if (item.title === "Attendance") {
-    onAttendanceClick();
-  } else {
-    window.alert(
-      `${item.title} will be connected to the backend next.`
-    );
-  }
-}}
+                    onClick={() => handleQuickLinkClick(item.title)}
                     className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-indigo-300 hover:shadow-md"
                   >
                     <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-2xl transition group-hover:bg-indigo-100">
@@ -982,18 +1040,20 @@ export default function DashboardPage({
                     </p>
                   </div>
                 </div>
-                <p className="mt-4 text-xs text-slate-400">
-                  Live notifications will be connected next.
-                </p>
+                <button
+                  type="button"
+                  onClick={onNotificationsClick}
+                  className="mt-4 text-sm font-semibold text-indigo-600 hover:text-indigo-800"
+                >
+                  View all notifications →
+                </button>
               </Section>
 
               <Section title="Your profile">
                 <div className="space-y-4">
                   <div>
                     <p className="text-xs text-slate-500">Full name</p>
-                    <p className="mt-1 text-sm font-semibold">
-                      {displayName}
-                    </p>
+                    <p className="mt-1 text-sm font-semibold">{displayName}</p>
                   </div>
                   <div>
                     <p className="text-xs text-slate-500">Email address</p>
@@ -1030,7 +1090,8 @@ export default function DashboardPage({
             </div>
 
             <footer className="pb-2 text-center text-xs text-slate-400">
-              © {new Date().getFullYear()} CampusFlow AI · Smart Campus Management
+              © {new Date().getFullYear()} CampusFlow AI · Smart Campus
+              Management
             </footer>
           </div>
         </main>
