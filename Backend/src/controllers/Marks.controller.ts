@@ -23,7 +23,6 @@ export const createMarks = async (req: Request, res: Response) => {
       assessmentType,
     } = req.body;
 
-    // Required fields
     if (
       !student ||
       !subject ||
@@ -40,7 +39,6 @@ export const createMarks = async (req: Request, res: Response) => {
       });
     }
 
-    // Validate ObjectIds
     if (
       !mongoose.Types.ObjectId.isValid(student) ||
       !mongoose.Types.ObjectId.isValid(subject) ||
@@ -52,7 +50,6 @@ export const createMarks = async (req: Request, res: Response) => {
       });
     }
 
-    // Validate assessment type
     const validAssessmentTypes = [
       "sessional",
       "assignment",
@@ -68,7 +65,6 @@ export const createMarks = async (req: Request, res: Response) => {
       });
     }
 
-    // Validate marks
     if (typeof marks !== "number" || typeof maxMarks !== "number") {
       return res.status(400).json({
         success: false,
@@ -97,7 +93,6 @@ export const createMarks = async (req: Request, res: Response) => {
       });
     }
 
-    // Validate semester
     if (semester < 1 || semester > 8) {
       return res.status(400).json({
         success: false,
@@ -105,7 +100,6 @@ export const createMarks = async (req: Request, res: Response) => {
       });
     }
 
-    // Check student
     const studentExists = await Student.findById(student);
 
     if (!studentExists) {
@@ -115,7 +109,6 @@ export const createMarks = async (req: Request, res: Response) => {
       });
     }
 
-    // Check subject
     const subjectExists = await Subject.findById(subject);
 
     if (!subjectExists) {
@@ -125,7 +118,6 @@ export const createMarks = async (req: Request, res: Response) => {
       });
     }
 
-    // Check faculty
     const facultyExists = await Faculty.findById(faculty);
 
     if (!facultyExists) {
@@ -135,7 +127,6 @@ export const createMarks = async (req: Request, res: Response) => {
       });
     }
 
-    // Check student semester
     if (studentExists.semester !== semester) {
       return res.status(400).json({
         success: false,
@@ -143,7 +134,6 @@ export const createMarks = async (req: Request, res: Response) => {
       });
     }
 
-    // Check subject semester
     if (subjectExists.semester !== semester) {
       return res.status(400).json({
         success: false,
@@ -151,7 +141,6 @@ export const createMarks = async (req: Request, res: Response) => {
       });
     }
 
-    // Check enrollment
     const enrollmentExists = await Enrollment.findOne({
       student,
       subject,
@@ -168,7 +157,6 @@ export const createMarks = async (req: Request, res: Response) => {
       });
     }
 
-    // Check duplicate marks
     const existingMarks = await Marks.findOne({
       student,
       subject,
@@ -184,7 +172,6 @@ export const createMarks = async (req: Request, res: Response) => {
       });
     }
 
-    // Create marks
     const newMarks = await Marks.create({
       student,
       subject,
@@ -196,7 +183,6 @@ export const createMarks = async (req: Request, res: Response) => {
       assessmentType,
     });
 
-    // Populate response
     const populatedMarks = await Marks.findById(newMarks._id)
       .populate("student")
       .populate("subject")
@@ -287,7 +273,8 @@ export const getMarksById = async (req: Request, res: Response) => {
 };
 
 // =====================================================
-// GET STUDENT MARKS
+// GET STUDENT MARKS BY STUDENT ID
+// ADMIN / HOD ACCESS
 // =====================================================
 export const getStudentMarks = async (req: Request, res: Response) => {
   try {
@@ -323,7 +310,6 @@ export const getStudentMarks = async (req: Request, res: Response) => {
         createdAt: 1,
       });
 
-    // Calculate overall statistics
     let totalMarksObtained = 0;
     let totalMaximumMarks = 0;
 
@@ -362,6 +348,85 @@ export const getStudentMarks = async (req: Request, res: Response) => {
 };
 
 // =====================================================
+// GET LOGGED-IN STUDENT'S OWN RESULTS
+// STUDENT ACCESS
+// =====================================================
+export const getMyStudentMarks = async (req: Request, res: Response) => {
+  try {
+    const authUser = (req as any).user;
+    const userId = authUser?.id;
+
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid authentication",
+      });
+    }
+
+    // Find Student profile using authenticated User ID
+    const student = await Student.findOne({
+      user: userId,
+    });
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Student profile not found",
+      });
+    }
+
+    // Fetch only the logged-in student's marks
+    const marks = await Marks.find({
+      student: student._id,
+    })
+      .populate("subject")
+      .populate("faculty")
+      .sort({
+        academicYear: 1,
+        semester: 1,
+        createdAt: 1,
+      });
+
+    let totalMarksObtained = 0;
+    let totalMaximumMarks = 0;
+
+    marks.forEach((item) => {
+      totalMarksObtained += item.marks;
+      totalMaximumMarks += item.maxMarks;
+    });
+
+    const percentage =
+      totalMaximumMarks > 0
+        ? Number(
+            ((totalMarksObtained / totalMaximumMarks) * 100).toFixed(2)
+          )
+        : 0;
+
+    return res.status(200).json({
+      success: true,
+      student: {
+        rollNumber: student.rollNumber,
+        semester: student.semester,
+      },
+      summary: {
+        totalAssessments: marks.length,
+        totalMarksObtained,
+        totalMaximumMarks,
+        percentage,
+      },
+      data: marks,
+    });
+  } catch (error: any) {
+    console.error("Get My Student Marks Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch your results",
+    });
+  }
+};
+
+// =====================================================
 // UPDATE MARKS
 // =====================================================
 export const updateMarks = async (req: Request, res: Response) => {
@@ -384,13 +449,8 @@ export const updateMarks = async (req: Request, res: Response) => {
       });
     }
 
-    const {
-      marks,
-      maxMarks,
-      assessmentType,
-    } = req.body;
+    const { marks, maxMarks, assessmentType } = req.body;
 
-    // Validate marks if provided
     if (marks !== undefined) {
       if (typeof marks !== "number" || marks < 0) {
         return res.status(400).json({
@@ -400,7 +460,6 @@ export const updateMarks = async (req: Request, res: Response) => {
       }
     }
 
-    // Validate maxMarks if provided
     if (maxMarks !== undefined) {
       if (typeof maxMarks !== "number" || maxMarks <= 0) {
         return res.status(400).json({
@@ -440,7 +499,6 @@ export const updateMarks = async (req: Request, res: Response) => {
         });
       }
 
-      // Check duplicate assessment type
       if (assessmentType !== existingMarks.assessmentType) {
         const duplicate = await Marks.findOne({
           _id: { $ne: id },
@@ -529,4 +587,3 @@ export const deleteMarks = async (req: Request, res: Response) => {
     });
   }
 };
-

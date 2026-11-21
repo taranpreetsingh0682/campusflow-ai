@@ -1,22 +1,33 @@
 
 import { Router } from "express";
+
 import {
   createMarks,
   getAllMarks,
   getMarksById,
   getStudentMarks,
+  getMyStudentMarks,
   updateMarks,
   deleteMarks,
 } from "../controllers/Marks.controller";
+
 import { protect } from "../middleware/auth.middleware";
 import { authorize } from "../middleware/role.middleware";
 
 const router = Router();
 
-// Require authentication for every marks route
+// All routes require authentication
 router.use(protect);
 
-// Read marks records
+// Student can access only their own results
+// Keep this route before /:id
+router.get(
+  "/my-results",
+  authorize("student"),
+  getMyStudentMarks
+);
+
+// Admin and HOD routes
 router.get(
   "/",
   authorize("admin", "hod"),
@@ -35,7 +46,6 @@ router.get(
   getMarksById
 );
 
-// Create, update, and delete marks
 router.post(
   "/",
   authorize("admin", "hod"),
