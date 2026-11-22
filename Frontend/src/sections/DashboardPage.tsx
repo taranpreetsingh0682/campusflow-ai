@@ -481,6 +481,12 @@ export default function DashboardPage({
 
   const firstName = displayName.split(/\s+/)[0];
 
+  // TARUN-ONLY EXAMINATION NOTIFICATION
+  const isTarun =
+    (profile.email || user.email || "").trim().toLowerCase() ===
+      "tarunrajput23@gmail.com" ||
+    (profile.rollNumber || user.rollNumber || "").trim() === "2323811";
+
   const initials = displayName
     .trim()
     .split(/\s+/)
@@ -694,6 +700,64 @@ export default function DashboardPage({
                 )}
               </div>
             </section>
+
+            {/* TARUN-ONLY EXAMINATION DATESHEET */}
+            {isTarun && (
+              <Section title="📢 Important: Semester 7 Examination Datesheet">
+                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <p className="font-bold text-amber-900">
+                    Your Semester 7 examinations are approaching!
+                  </p>
+                  <p className="mt-1 text-sm text-amber-800">
+                    Please note the following examination dates.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  {[
+                    {
+                      date: "01 December 2026",
+                      subject: "DSRP (Data Science with R Programming)",
+                    },
+                    { date: "04 December 2026", subject: "UHV" },
+                    {
+                      date: "08 December 2026",
+                      subject: "MPI (Microprocessor)",
+                    },
+                    {
+                      date: "11 December 2026",
+                      subject: "Soft Computing",
+                    },
+                    {
+                      date: "18 December 2026",
+                      subject: "Deep Learning",
+                    },
+                  ].map((exam) => (
+                    <div
+                      key={exam.date}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4"
+                    >
+                      <div>
+                        <p className="font-semibold text-slate-900">
+                          {exam.subject}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          Examination date
+                        </p>
+                      </div>
+                      <span className="rounded-lg bg-indigo-50 px-3 py-2 text-sm font-bold text-indigo-700">
+                        {exam.date}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="mt-4 text-xs text-slate-500">
+                  Please verify the schedule against the official college
+                  datesheet.
+                </p>
+              </Section>
+            )}
 
             <section>
               <div className="mb-4 flex items-center justify-between">
@@ -1200,6 +1264,22 @@ export default function DashboardPage({
                     </p>
                   </div>
                 </div>
+
+                {isTarun && (
+                  <div className="mt-3 flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <span className="text-xl">📢</span>
+                    <div>
+                      <p className="text-sm font-semibold text-amber-900">
+                        Semester 7 examination datesheet published
+                      </p>
+                      <p className="mt-1 text-sm leading-5 text-amber-800">
+                        Your December 2026 examination schedule is available
+                        on your dashboard.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <button
                   type="button"
                   onClick={onNotificationsClick}
