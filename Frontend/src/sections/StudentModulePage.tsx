@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type ModuleName =
   | "fees"
@@ -19,6 +19,29 @@ type Props = {
   onBack: () => void;
   onLogout: () => void;
 };
+
+type SemesterResult = {
+  _id: string;
+  semester: number;
+  sgpa: number;
+};
+
+type ResultsResponse = {
+  success: boolean;
+  student?: {
+    rollNumber: string;
+    currentSemester: number;
+  };
+  summary?: {
+    totalSemesters: number;
+    averageSGPA: number;
+  };
+  data?: SemesterResult[];
+  message?: string;
+};
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const pageInfo = {
   fees: {
@@ -84,14 +107,75 @@ export default function StudentModulePage({
   const [category, setCategory] = useState("Academic");
   const [submitted, setSubmitted] = useState(false);
 
+  const [semesterResults, setSemesterResults] = useState<SemesterResult[]>([]);
+  const [averageSGPA, setAverageSGPA] = useState<number | null>(null);
+  const [currentSemester, setCurrentSemester] = useState(7);
+  const [resultsLoading, setResultsLoading] = useState(false);
+  const [resultsError, setResultsError] = useState("");
+
   const info = pageInfo[page];
   const name = user.name || "Student";
+
+  useEffect(() => {
+    if (page !== "results") return;
+
+    const fetchSemesterResults = async () => {
+      setResultsLoading(true);
+      setResultsError("");
+
+      try {
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+          throw new Error("Please login again. Authentication token not found.");
+        }
+
+        const response = await fetch(
+          `${API_BASE_URL}/semester-results/my-results`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        const result: ResultsResponse = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(
+            result.message || "Unable to load semester results."
+          );
+        }
+
+        setSemesterResults(result.data || []);
+        setAverageSGPA(result.summary?.averageSGPA ?? null);
+        setCurrentSemester(result.student?.currentSemester || 7);
+      } catch (error) {
+        console.error("Semester results error:", error);
+        setResultsError(
+          error instanceof Error
+            ? error.message
+            : "Something went wrong while loading results."
+        );
+      } finally {
+        setResultsLoading(false);
+      }
+    };
+
+    fetchSemesterResults();
+  }, [page]);
 
   function submitComplaint() {
     if (!complaint.trim()) return;
     setSubmitted(true);
     setComplaint("");
   }
+
+  const resultMap = new Map(
+    semesterResults.map((result) => [result.semester, result])
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
@@ -226,36 +310,116 @@ export default function StudentModulePage({
         {page === "results" && (
           <>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              <Card title="Current semester" value="Semester 7" detail="Profile-based academic year" />
-              <Card title="SGPA" value="Not available" detail="Awaiting verified result data" />
-              <Card title="CGPA" value="Not available" detail="Awaiting verified result data" />
+              <Card
+                title="Current semester"
+                value={`Semester ${currentSemester}`}
+                detail="Based on student profile"
+              />
+              <Card
+                title="Average SGPA"
+                value={
+                  resultsLoading
+                    ? "Loading..."
+                    : averageSGPA !== null
+                      ? averageSGPA.toFixed(2)
+                      : "Not available"
+                }
+                detail="Average of available semester results"
+              />
+              <Card
+                title="Published results"
+                value={resultsLoading ? "..." : String(semesterResults.length)}
+                detail="Semesters with available SGPA"
+              />
             </div>
+
             <section className="rounded-2xl border border-slate-200 bg-white p-6">
-              <h3 className="text-lg font-bold">Semester-wise results</h3>
-              <div className="mt-4 overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-slate-500">
-                    <tr>
-                      <th className="p-3">Semester</th>
-                      <th className="p-3">SGPA</th>
-                      <th className="p-3">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {["1", "2", "3", "4", "5", "6", "7"].map((sem) => (
-                      <tr key={sem} className="border-b border-slate-100">
-                        <td className="p-3">Semester {sem}</td>
-                        <td className="p-3 text-slate-400">Not loaded</td>
-                        <td className="p-3">
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs">
-                            Awaiting result data
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-bold">Semester-wise results</h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Your academic performance across semesters.
+                  </p>
+                </div>
+                <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+                  SGPA Scale: 10.0
+                </span>
               </div>
+
+              {resultsLoading && (
+                <p className="mt-6 text-sm text-slate-500">
+                  Loading your semester results...
+                </p>
+              )}
+
+              {resultsError && (
+                <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                  {resultsError}
+                </div>
+              )}
+
+              {!resultsLoading && !resultsError && (
+                <div className="mt-5 overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 text-slate-500">
+                      <tr>
+                        <th className="p-3">Semester</th>
+                        <th className="p-3">SGPA</th>
+                        <th className="p-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.from(
+                        { length: Math.max(currentSemester, 7) },
+                        (_, index) => index + 1
+                      ).map((sem) => {
+                        const result = resultMap.get(sem);
+                        const isAwaited =
+                          sem === currentSemester && !result;
+
+                        return (
+                          <tr key={sem} className="border-b border-slate-100">
+                            <td className="p-3 font-medium">
+                              Semester {sem}
+                            </td>
+                            <td className="p-3 font-semibold text-slate-900">
+                              {result ? result.sgpa.toFixed(2) : "—"}
+                            </td>
+                            <td className="p-3">
+                              {result ? (
+                                <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
+                                  Published
+                                </span>
+                              ) : isAwaited ? (
+                                <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                                  Result Awaited
+                                </span>
+                              ) : (
+                                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-500">
+                                  Not available
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {!resultsLoading &&
+                !resultsError &&
+                semesterResults.length === 0 && (
+                  <p className="mt-5 text-sm text-slate-500">
+                    No semester results have been published yet.
+                  </p>
+                )}
+
+              <p className="mt-5 text-xs text-slate-400">
+                Average SGPA is calculated from the available semester records.
+                Semester 7 will show Result Awaited until its result is published.
+              </p>
             </section>
           </>
         )}
