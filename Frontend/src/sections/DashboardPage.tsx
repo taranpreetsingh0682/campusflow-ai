@@ -78,6 +78,22 @@ type AttendanceResponse = {
   data?: AttendanceRecord[];
 };
 
+type SemesterResult = {
+  _id: string;
+  semester: number;
+  sgpa: number;
+};
+
+type ResultsResponse = {
+  success: boolean;
+  message?: string;
+  summary?: {
+    totalSemesters?: number;
+    averageSGPA?: number;
+  };
+  data?: SemesterResult[];
+};
+
 type DashboardPageProps = {
   user: Student;
   onLogout: () => void;
@@ -185,6 +201,11 @@ export default function DashboardPage({
   const [feesLoading, setFeesLoading] = useState(true);
   const [feesError, setFeesError] = useState("");
 
+  const [results, setResults] = useState<SemesterResult[]>([]);
+  const [resultsLoading, setResultsLoading] = useState(true);
+  const [resultsError, setResultsError] = useState("");
+  const [averageSGPA, setAverageSGPA] = useState(0);
+
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [attendanceLoading, setAttendanceLoading] = useState(true);
   const [attendanceError, setAttendanceError] = useState("");
@@ -193,6 +214,7 @@ export default function DashboardPage({
   const [presentClasses, setPresentClasses] = useState(0);
   const [absentClasses, setAbsentClasses] = useState(0);
 
+  // PROFILE
   useEffect(() => {
     let cancelled = false;
 
@@ -252,6 +274,7 @@ export default function DashboardPage({
     };
   }, []);
 
+  // FEES
   useEffect(() => {
     let cancelled = false;
 
@@ -305,6 +328,68 @@ export default function DashboardPage({
     };
   }, []);
 
+  // SEMESTER RESULTS
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchMyResults() {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        setResultsError("Please sign in again to view your results.");
+        setResultsLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/semester-results/my-results`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const result: ResultsResponse = await response.json();
+
+        if (!response.ok || !result.success) {
+          if (response.status === 401) {
+            throw new Error(
+              "Your session is invalid or expired. Please sign in again."
+            );
+          }
+
+          throw new Error(result.message || "Could not load semester results.");
+        }
+
+        if (!cancelled) {
+          setResults(Array.isArray(result.data) ? result.data : []);
+          setAverageSGPA(result.summary?.averageSGPA ?? 0);
+          setResultsError("");
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setResultsError(
+            error instanceof Error
+              ? error.message
+              : "Could not connect to the results API."
+          );
+        }
+      } finally {
+        if (!cancelled) setResultsLoading(false);
+      }
+    }
+
+    void fetchMyResults();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ATTENDANCE
   useEffect(() => {
     let cancelled = false;
 
@@ -328,7 +413,7 @@ export default function DashboardPage({
 
         if (!studentId) {
           throw new Error(
-            "Student ID is missing from your profile. We need to link your login account to its Student record in the backend."
+            "Student ID is missing from your profile. Please check your backend profile link."
           );
         }
 
@@ -477,9 +562,7 @@ export default function DashboardPage({
             </div>
             <div>
               <h1 className="text-lg font-bold">CampusFlow AI</h1>
-              <p className="text-xs text-slate-400">
-                Smart Campus Platform
-              </p>
+              <p className="text-xs text-slate-400">Smart Campus Platform</p>
             </div>
           </div>
 
@@ -573,9 +656,7 @@ export default function DashboardPage({
                 role="alert"
                 className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
               >
-                <p className="font-semibold">
-                  Could not refresh your profile
-                </p>
+                <p className="font-semibold">Could not refresh your profile</p>
                 <p className="mt-1">{profileError}</p>
                 <button
                   type="button"
@@ -685,6 +766,7 @@ export default function DashboardPage({
               </div>
             </section>
 
+            {/* ATTENDANCE */}
             <Section title="Attendance report">
               {attendanceLoading && (
                 <p className="text-sm text-slate-500">
@@ -806,6 +888,7 @@ export default function DashboardPage({
               )}
             </Section>
 
+            {/* FEES */}
             <Section title="Semester fees & payments">
               {feesLoading && (
                 <p className="text-sm text-slate-500">
@@ -997,6 +1080,82 @@ export default function DashboardPage({
               )}
             </Section>
 
+            {/* RESULTS */}
+            <Section title="Semester Results">
+              {resultsLoading && (
+                <p className="text-sm text-slate-500">
+                  Loading semester results...
+                </p>
+              )}
+
+              {resultsError && (
+                <div
+                  role="alert"
+                  className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+                >
+                  <p className="font-semibold">Could not load results</p>
+                  <p className="mt-1">{resultsError}</p>
+                </div>
+              )}
+
+              {!resultsLoading && !resultsError && (
+                <>
+                  <div className="mb-5 rounded-xl bg-indigo-50 p-4">
+                    <p className="text-sm text-indigo-700">
+                      Average SGPA (available semesters)
+                    </p>
+                    <p className="mt-1 text-2xl font-bold text-indigo-950">
+                      {averageSGPA.toFixed(2)}
+                    </p>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    {Array.from({ length: 6 }, (_, index) => {
+                      const semester = index + 1;
+                      const semesterResult = results.find(
+                        (item) => item.semester === semester
+                      );
+
+                      return (
+                        <div
+                          key={semester}
+                          className="rounded-xl border border-slate-200 p-4"
+                        >
+                          <p className="text-sm text-slate-500">
+                            Semester {semester}
+                          </p>
+                          <p className="mt-2 text-xl font-bold text-slate-900">
+                            {semesterResult
+                              ? semesterResult.sgpa.toFixed(2)
+                              : "Awaited"}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {semesterResult ? "Demo result" : "Not available"}
+                          </p>
+                        </div>
+                      );
+                    })}
+
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                      <p className="text-sm text-amber-700">Semester 7</p>
+                      <p className="mt-2 font-bold text-amber-900">
+                        Result Awaited
+                      </p>
+                      <p className="mt-1 text-xs text-amber-700">
+                        Examination pending
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="mt-4 text-xs text-slate-400">
+                    Demo academic data for project testing. Not official
+                    university results.
+                  </p>
+                </>
+              )}
+            </Section>
+
+            {/* QUICK ACCESS */}
             <section>
               <h2 className="mb-4 text-xl font-bold text-slate-900">
                 Quick access
@@ -1026,6 +1185,7 @@ export default function DashboardPage({
               </div>
             </section>
 
+            {/* NOTIFICATIONS + PROFILE */}
             <div className="grid gap-6 lg:grid-cols-2">
               <Section title="Recent notifications">
                 <div className="flex gap-3 rounded-xl bg-indigo-50 p-4">
